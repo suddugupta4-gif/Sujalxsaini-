@@ -1,0 +1,163 @@
+{
+  "channelName": "sujalxsaini",
+  "channelUrl": "https://kick.com/sujalxsaini",
+  "pin": "1234",
+  "followerCount": 1251,
+  "followerGoal": 2000,
+  "goalTitle": "ROAD TO 2,000 FOLLOWERS",
+  "showGoalOnCounter": true,
+  "alertsPaused": false,
+  "alertsMuted": false,
+  "activeAlertTemplate": "neon",
+  "activeCounterTemplate": "neon",
+  "selectedFont": "Rajdhani",
+  "counterFont": "Orbitron",
+  "alertDuration": 5,
+  "sfxPreset": "cyber",
+  "customSfxUrl": "",
+  "ttsSettings": {
+    "enabled": true,
+    "mode": "stream",
+    "lang": "hi-IN",
+    "messageTemplate": "{username} started following",
+    "rate": 1.1,
+    "pitch": 1,
+    "volume": 1
+  },
+  "recentFollowers": [
+    {
+      "id": "fol-1794496172944-m19s",
+      "username": "AaravSniper_IN",
+      "timestamp": "2026-11-12T15:09:32.944Z",
+      "source": "simulator"
+    },
+    {
+      "id": "fol-seed-1",
+      "username": "RohanGamingIN",
+      "timestamp": "2026-11-12T15:02:30.353Z",
+      "source": "kick-webhook"
+    },
+    {
+      "id": "fol-seed-2",
+      "username": "ApexValkyrie",
+      "timestamp": "2026-11-12T14:54:30.354Z",
+      "source": "kick-webhook"
+    },
+    {
+      "id": "fol-seed-3",
+      "username": "KaranClutchX",
+      "timestamp": "2026-11-12T14:41:30.354Z",
+      "source": "kick-webhook"
+    },
+    {
+      "id": "fol-seed-4",
+      "username": "NeonSamurai99",
+      "timestamp": "2026-11-12T14:23:30.354Z",
+      "source": "kick-webhook"
+    }
+  ],
+  "webhookLogs": [
+    {
+      "id": "wh-1794496172944-6ra6",
+      "timestamp": "2026-11-12T15:09:32.944Z",
+      "eventType": "channel.followed",
+      "username": "AaravSniper_IN",
+      "status": 200,
+      "headers": {
+        "host": "localhost:3000",
+        "connection": "keep-alive",
+        "content-length": "231",
+        "sec-ch-ua-platform": "\"Linux\"",
+        "x-sujalx-simulated": "true",
+        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.8059.12 Safari/537.36",
+        "sec-ch-ua": "\"HeadlessChrome\";v=\"155\", \"Chromium\";v=\"155\", \"Not(A:Brand\";v=\"24\"",
+        "kick-event-type": "channel.followed",
+        "content-type": "application/json",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://localhost:3000",
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://localhost:3000/?autostart=1",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "payload": {
+        "event": "channel.followed",
+        "channel": {
+          "id": 948201,
+          "slug": "sujalxsaini",
+          "url": "https://kick.com/sujalxsaini"
+        },
+        "follower": {
+          "username": "AaravSniper_IN",
+          "slug": "aaravsniper_in",
+          "verified": true
+        },
+        "created_at": "2026-11-12T15:09:32.901Z"
+      }
+    },
+    {
+      "id": "wh-seed-1",
+      "timestamp": "2026-11-12T15:02:30.354Z",
+      "eventType": "channel.followed",
+      "username": "RohanGamingIN",
+      "status": 200,
+      "headers": {
+        "kick-event-type": "channel.followed",
+        "user-agent": "Kick-Webhook-Engine/1.0",
+        "content-type": "application/json"
+      },
+      "payload": {
+        "event": "channel.followed",
+        "channel": {
+          "slug": "sujalxsaini",
+          "id": 948201
+        },
+        "follower": {
+          "username": "RohanGamingIN",
+          "verified": true
+        },
+        "created_at": "2026-11-12T15:02:30.354Z"
+      }
+    },
+    {
+      "id": "wh-seed-2",
+      "timestamp": "2026-11-12T14:54:30.354Z",
+      "eventType": "channel.followed",
+      "username": "ApexValkyrie",
+      "status": 200,
+      "headers": {
+        "kick-event-type": "channel.followed",
+        "user-agent": "Kick-Webhook-Engine/1.0",
+        "content-type": "application/json"
+      },
+      "payload": {
+        "event": "channel.followed",
+        "channel": {
+          "slug": "sujalxsaini",
+          "id": 948201
+        },
+        "follower": {
+          "username": "ApexValkyrie",
+          "verified": false
+        },
+        "created_at": "2026-11-12T14:54:30.354Z"
+      }
+    }
+  ],
+  "setupChecklist": {
+    "obsStep1LinksCopied": true,
+    "obsStep2SourceCreated": true,
+    "obsStep3DimensionsSet": false,
+    "obsStep4AudioControlEnabled": false,
+    "obsStep5MonitorAndOutput": false,
+    "obsStep6VerifiedLive": false,
+    "webhookStep1UrlCopied": true,
+    "webhookStep2AppCreated": false,
+    "webhookStep3SubscribedFollowed": false,
+    "webhookStep4SimulatedTest": true,
+    "webhookStep5RenderDeployed": false
+  },
+  "customAvatarUrl": ""
+}

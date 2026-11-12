@@ -1,0 +1,6 @@
+{
+  "name": "SujalX Kick Studio",
+  "description": "Private VIP OBS Alert, Animated TTS, Follower Counter & Zero-to-Everything Webhook Suite for Kick streamer sujalxsaini.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

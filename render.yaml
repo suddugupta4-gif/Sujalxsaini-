@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: sujalx-kick-studio
+    runtime: node
+    plan: free
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: NODE_ENV=production npx tsx server.ts
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: KICK_CHANNEL_SLUG
+        value: sujalxsaini
+      - key: ADMIN_PIN
+        value: "1234"

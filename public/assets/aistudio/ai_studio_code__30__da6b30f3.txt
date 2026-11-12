@@ -1,0 +1,135 @@
+# MASTER PROMPT: SujalX Kick Studio — Private VIP OBS Alert, Animated TTS, Follower Counter & "Zero-to-Everything" Webhook Suite
+
+## 1. Project Overview & Target User
+Build a complete, production-ready, full-stack web application (Node.js/Express backend + React 19/TypeScript/Tailwind CSS/Framer Motion/`canvas-confetti`/`lucide-react` frontend) designed exclusively as a private, ultra-premium Streamlabs alternative for the Kick streamer **sujalxsaini** (`https://kick.com/sujalxsaini`).
+
+The application must run as a single unified Node.js Web Service (`server.ts` serving both the API/real-time Server-Sent Events and the Vite/React frontend) so it can be deployed seamlessly to **Render.com (`onrender.com`)**.
+
+---
+
+## 2. Premium Google Fonts & Visual Styling (`index.html`)
+In `index.html`, import the following **8 Premium Google Fonts** from `fonts.googleapis.com` and make them selectable across all overlays and templates:
+1. **`Orbitron`** (Cyberpunk / Sci-Fi / Kick Neon Header Font)
+2. **`Cinzel`** (Royal VIP / Luxury Gold / Sovereign Serif Font)
+3. **`Chakra Petch`** (Valorant / Esports Tactical HUD Font)
+4. **`Rajdhani`** (Modern Gaming / Broadcast Tech Font)
+5. **`Outfit`** (Apple VisionOS / Spatial Glassmorphism Font)
+6. **`Bebas Neue`** (Anime Overdrive / High-Impact Arcade Display Font)
+7. **`Syne`** (Holographic Synthwave / Avant-Garde VIP Font)
+8. **`JetBrains Mono`** (Matrix / Terminal / Odometer Digital Font)
+
+Include custom CSS keyframe animations for liquid gold shimmer (`@keyframes shimmer`), cyberpunk glitch (`@keyframes glitch`), and neon pulse shadows (`#53FC18` Kick Green, `#FFD700` VIP Gold, `#FF0055` Radiant Crimson, `#00F0FF` Cyber Cyan).
+
+---
+
+## 3. Foolproof OBS Link Generator & Routing Architecture (CRITICAL)
+To guarantee that generated OBS links NEVER return a `404 Not Found` error on Render.com or inside OBS Studio Browser Sources:
+
+1. **Root Query-Parameter Overlay Routing (`window.location.search`):**
+   - At the very top of `App.tsx`, inspect `new URLSearchParams(window.location.search)`.
+   - **If `params.get('obs') === 'alerts'`:** Render ONLY the transparent **OBS Follower Alert & TTS Overlay Canvas** (`document.body.style.background = 'transparent'`, zero dashboard UI). Read URL query overrides (`&template=`, `&font=`, `&tts=`, `&voice=`, `&sfx=`, `&duration=`) and connect to `GET /api/events?client=obs-alerts` for real-time follower popups, milestone confetti, and animated Text-to-Speech.
+   - **If `params.get('obs') === 'counter'`:** Render ONLY the transparent **OBS Follower Counter Overlay Canvas** (`document.body.style.background = 'transparent'`). Read `&template=`, `&font=`, and `&showGoal=` from the URL, and connect to `GET /api/events?client=obs-counter` for real-time follower count updates.
+   - **If no `?obs=` parameter is present:** Render the **Private VIP Streamer Dashboard** for `sujalxsaini`.
+
+2. **Interactive "⚡ Generate OBS Link" Builder Component:**
+   - Dynamically construct OBS URLs using `${window.location.origin}/?obs=...` so it automatically uses the live `.onrender.com` URL.
+   - Whenever the user clicks **"⚡ Generate OBS Link"** on any Alert or Follower Counter template, display a **Streamlabs-Style OBS Link Generator Panel** featuring:
+     - **Generated OBS URL Input Box** with a **Privacy Blur Toggle** (eye icon to hide/show the URL when streaming).
+     - **"📋 Copy Link for OBS" Button** (one-click copy with visual confirmation).
+     - **"↗️ Test Overlay in New Tab" Button** (opens the exact generated `?obs=` link in a new tab to verify transparency and animations).
+     - **Live OBS Connection Status Badge:** The backend tracks connected SSE clients (`obs-alerts` and `obs-counter`). Display **`🟢 Connected in OBS (X active)`** on the dashboard the moment the link is opened in OBS Studio!
+     - **Recommended OBS Browser Source Settings:** Shows exact `Width x Height` (`850 x 600` for Alerts, `550 x 200` for Counter) and a one-click copyable **OBS Custom CSS** snippet:
+       `body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow: hidden; }`
+
+---
+
+## 4. Backend Server (`server.ts`), Webhook Engine & Real-Time SSE
+Implement a complete Express + Vite server in `server.ts`:
+1. **Persistent JSON State (`settings.json`):**
+   - Stores `channelName` (`"sujalxsaini"`), `channelUrl` (`"https://kick.com/sujalxsaini"`), `pin` (`"1234"`), `followerCount` (`1250`), `followerGoal` (`1500`), `goalTitle` (`"ROAD TO 1.5K FOLLOWERS"`), `alertsPaused` (`false`), `alertsMuted` (`false`), `activeAlertTemplate` (`"neon"`), `activeCounterTemplate` (`"neon"`), `selectedFont` (`"Orbitron"`), `alertDuration` (`7`), `sfxPreset` (`"cyber"`), `customSfxUrl` (`""`), `ttsSettings` (`enabled: true`, `mode: "stream"`, `lang: "en-US"`, `messageTemplate: "{username} just started following sujalxsaini! Welcome to the VIP squad!"`, `rate: 1.0`, `pitch: 1.0`, `volume: 1.0`), `recentFollowers` (array), `webhookLogs` (array of recent incoming webhook requests with timestamp, event type, and payload for the live debugger), and `setupChecklist` (progress tracker for the Zero-to-Everything guide).
+2. **Server-Sent Events (`GET /api/events`):**
+   - Tracks client types via `?client=dashboard`, `?client=obs-alerts`, or `?client=obs-counter`.
+   - Broadcasts `STATE_INIT`, `SETTINGS_UPDATED`, `FOLLOW_ALERT`, `CUSTOM_TTS_ANNOUNCE`, `MILESTONE_REACHED`, `WEBHOOK_RECEIVED`, `QUEUE_CONTROL`, and `OBS_STATUS_CHANGED`.
+3. **Kick Official Webhook Endpoint (`POST /api/webhook/kick`) & Webhook Simulator (`POST /api/webhook/simulate`):**
+   - Accepts official Kick `channel.followed` webhook POST requests (supporting headers like `Kick-Event-Type: channel.followed` and extracting follower username from `req.body?.follower?.username || req.body?.data?.follower?.username || req.body?.username || "KickUser"`).
+   - Logs every incoming webhook call into `webhookLogs` (timestamp, headers, payload, status) and broadcasts `WEBHOOK_RECEIVED` so the user can see live webhook traffic in the Dashboard's **Webhook Inspector**.
+   - Increments `followerCount` by 1, adds to `recentFollowers`, and broadcasts `FOLLOW_ALERT` to all connected OBS overlays.
+   - **Automatic Goal Milestone Trigger:** If the new `followerCount` equals `followerGoal`, automatically broadcast `MILESTONE_REACHED` so OBS fires a full-screen confetti & fanfare celebration.
+   - Always responds with `200 OK` (`{ received: true }`) immediately so Kick never disables the webhook.
+4. **Health & Keep-Alive Endpoint (`GET /api/health`):**
+   - Returns `{ status: "ok", channel: "sujalxsaini", uptime: process.uptime() }` so Render.com or UptimeRobot can keep the service awake 24/7.
+5. **Multi-Accent OBS Text-to-Speech Proxy (`GET /api/tts`):**
+   - Accepts `?text=...&lang=...` (supporting `en-IN` Indian English, `hi-IN` Hindi, `en-US` US English, `en-GB` British English, `ja-JP` Japanese, `es-ES` Spanish).
+   - Fetches and streams `audio/mpeg` from `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${lang}&client=tw-ob` so OBS Browser Sources play crystal-clear TTS via standard HTML5 `<audio>`. Also support Browser `window.speechSynthesis` as an optional toggle.
+6. **Synthesized Polyphonic Web Audio API Sound Effects:**
+   - Build a synthesizer utility using `AudioContext` with **6 Premium Alert Sound Presets** (`cyber`, `royal`, `valorant`, `anime`, `glass`, `arcade`) so every alert plays a crisp polyphonic sound effect before the TTS speaks.
+
+---
+
+## 5. 6 Ultra-Premium Follower Alert + Animated TTS Templates (`/?obs=alerts`)
+Each alert template must support customizable Google Fonts, entrance/exit animations, particle bursts (`canvas-confetti`), a glowing badge, the follower's name, the custom TTS message subtitle, and a **Live Animated Audio Equalizer / Waveform** that dances while the TTS voice is speaking:
+
+1. **`neon` — Kick Apex Cyber (Default):** Signature Kick `#53FC18` laser border, matte obsidian card, rotating 3D-style Kick "K" hexagon badge, cyber corner brackets, glitching follower name in `Orbitron`, and a 16-bar neon green spectrum analyzer for TTS.
+2. **`gold` — Imperial Sovereign VIP Gold:** Luxury black marble & brushed metallic gold plaque, animated SVG golden crown, sweeping light sheen, follower name in `Cinzel`, floating gold dust particles, and a circular golden soundwave aura during TTS.
+3. **`esports` — Radiant Protocol Tactical HUD:** Valorant-inspired sharp angled crimson (`#FF0055`) & emerald (`#53FC18`) HUD frame, animated crosshair lock-on icon, kinetic sliding typography in `Chakra Petch`, and aggressive tactical telemetry bars for TTS.
+4. **`glass` — VisionOS Spatial Frosted Glass:** Ultra-modern Apple spatial glass pill (`backdrop-blur-2xl bg-white/10`), iridescent specular border highlight, smooth spring physics in `Outfit`, pulsing 3D heart icon, and a glowing Siri-style multi-color fluid wave during TTS.
+5. **`anime` — Anime Overdrive Slash:** High-voltage electric cyan & magenta energy aura, diagonal katana-slash reveal animation, comic speed-line accents, giant impact typography in `Bebas Neue`, and high-energy spiky equalizer bars.
+6. **`holo` — Holographic Synthwave VIP:** Iridescent rainbow-chrome foil border, retro-futuristic neon grid & sun backdrop, bold `Syne` display typography, VIP star emblem, and dual-channel synthwave VU meter for TTS.
+
+---
+
+## 6. 6 Ultra-Premium Follower Counter Templates (`/?obs=counter`)
+Each counter template must feature smooth rolling digit animations when the count changes, selectable Google Fonts, an optional **Follower Goal Progress Bar**, and a latest follower mini-badge:
+
+1. **`neon` — Kick Neon Pulse Pro:** Glowing `#53FC18` neon tube frame, Kick icon, large rolling counter digits, percentage badge, and liquid neon goal bar.
+2. **`gold` — Royal Gold & Obsidian Crest:** 3D luxury dark metallic badge with sweeping gold light reflection, crown icon, and embossed gold numbers.
+3. **`esports` — Tactical Broadcast HUD:** Angled esports overlay bar with pulsing red `LIVE` indicator, `SUJALXSAINI // FOLLOWERS` header, and segmented armor-style goal progress bar.
+4. **`glass` — Spatial Glass Floating Pill:** Sleek rounded frosted glass pill with beating neon heart, compact rolling counter, and subtle glow.
+5. **`matrix` — Cyberpunk Matrix Terminal:** Retro CRT scanline card with glowing emerald/cyan borders, `root@sujalxsaini:~# followers` header, and monospace digital readout.
+6. **`holo` — Holographic Chrome Ticker:** Iridescent chrome-bordered widget showing both the live Follower Count AND a smooth scrolling marquee of the last 3 followers.
+
+---
+
+## 7. "Zero-to-Everything" Interactive Setup Center (Built Into the Website)
+Create two dedicated, comprehensive, interactive setup tabs inside the website so **sujalxsaini** has a complete **Zero-to-Everything guide** with interactive checkboxes, copyable snippets, visual diagrams, and live verification tools:
+
+### A. Tab: "Zero-to-Live OBS Setup Guide" (Step-by-Step Interactive Tutorial)
+Include an interactive 6-step visual checklist from Zero to Live:
+- **Step 1: Generate & Copy Your Links (Right inside this tab):** Quick-copy cards for both the **Follower Alert + TTS URL** (`${window.location.origin}/?obs=alerts&...`) and **Follower Counter URL** (`${window.location.origin}/?obs=counter&...`).
+- **Step 2: Create the OBS Browser Source:** Visual mockup showing `OBS Studio -> Sources Dock -> Click [+] -> Select "Browser" -> Name it "SujalX Kick Alerts"`.
+- **Step 3: Paste Link & Set Exact Dimensions:** Shows exact copyable dimensions (`Width: 850`, `Height: 600` for Alerts; `Width: 550`, `Height: 200` for Counter) and the copyable **OBS Custom CSS** for 100% transparency.
+- **Step 4: Enable OBS Audio for Text-to-Speech (CRITICAL):** Visual highlight showing the checkbox **"☑ Control audio via OBS"** inside the Browser Source properties, plus checking **"☑ Refresh browser when scene becomes active"**.
+- **Step 5: Hear TTS in Your Headphones (OBS Audio Mixer):** Step-by-step diagram showing `OBS Audio Mixer -> Click Gear Icon ⚙️ next to "SujalX Kick Alerts" -> Advanced Audio Properties -> Set Audio Monitoring to "Monitor and Output"`.
+- **Step 6: Live Verification Test:** Shows the live status indicator (`🟢 Connected in OBS` vs `⚪ Waiting for OBS...`) and a **"🔊 Send Test Audio & Alert to OBS Now"** button right inside the guide so the user can confirm they see the popup and hear the voice inside OBS!
+
+### B. Tab: "Zero-to-Live Kick Webhook System" (Complete Webhook Wizard & Debugger)
+Build a complete, zero-to-everything **Kick Webhook Setup Wizard & Live Debugger** for `https://kick.com/sujalxsaini`:
+- **Step 1: Your Auto-Generated Webhook Callback URL:**
+  - Displays `${window.location.origin}/api/webhook/kick` in a prominent neon box with a **"📋 Copy Webhook URL"** button.
+- **Step 2: Open Kick Developer Portal (`kick.com/settings/developer`):**
+  - Direct clickable button to open `https://kick.com/settings/developer` while logged into `sujalxsaini`.
+  - Visual step-by-step instructions:
+    1. Click **"Create New App"** (Name it `SujalX Overlay Studio`).
+    2. Toggle on **"Enable Webhooks"**.
+    3. Paste your copied Webhook URL (`${window.location.origin}/api/webhook/kick`) into the **Webhook Callback URL** field.
+    4. Under **Event Subscriptions**, check **`channel.followed`** (triggers every time someone follows `kick.com/sujalxsaini`).
+    5. Save your Kick Developer App.
+- **Step 3: cURL / Postman & API Webhook Tester (Built-In):**
+  - Displays a ready-to-copy `curl -X POST` command pre-filled with `${window.location.origin}/api/webhook/kick` so the user can test from any terminal.
+  - Includes a **"⚡ Send Simulated Kick Webhook (`channel.followed`)"** button with a username input right inside the page. Clicking it sends a real HTTP POST request with a genuine Kick `channel.followed` JSON payload and `Kick-Event-Type: channel.followed` header to `/api/webhook/kick`, proving the entire webhook pipeline works end-to-end!
+- **Step 4: Live Webhook Traffic Inspector (Real-Time Terminal):**
+  - A dark terminal window inside the dashboard that logs every incoming `POST /api/webhook/kick` request in real time (showing Timestamp, `200 OK` badge, Event Type `channel.followed`, Follower Username, and expandable JSON payload).
+- **Step 5: Zero-to-Live Render.com (`onrender.com`) Hosting Guide:**
+  - Step-by-step card showing how to push to GitHub, connect to **Render.com (`New -> Web Service`)**, set Build Command (`npm install && npm run build`), Start Command (`npm run start`), and copy the `.onrender.com` URL back to Kick's Webhook settings, plus displaying the built-in Keep-Alive URL (`${window.location.origin}/api/health`).
+
+---
+
+## 8. Complete Dashboard Navigation Structure (Private for `sujalxsaini`)
+Protect the dashboard (`/`) with a sleek **VIP PIN Lock Screen** (default PIN: `1234`, saved in `sessionStorage`; `?obs=` links automatically bypass the PIN so OBS loads them immediately).
+
+Include a persistent **Top Live Stream Deck Header** (with Channel Badge, live `🟢 OBS Alerts` and `🟢 OBS Counter` connection badges, **"🔥 Fire Test Alert + TTS"** button, **"🎉 Trigger Milestone Confetti"** button, and Queue Pause/Skip/Mute controls) and **5 Main Navigation Tabs**:
+1. **🎨 Alert Studio & Animated TTS** (6 Alert Templates, 8 Google Fonts, Multi-Accent TTS Customizer, 6 Sound Presets, and `⚡ Generate OBS Alert Link`).
+2. **🔢 Follower Counters & Goals** (6 Counter Templates, Live Count & Goal Editor with `+1`/`-1`, and `⚡ Generate OBS Counter Link`).
+3. **🔗 Zero-to-Live Kick Webhook Setup** (Complete step-by-step Kick Developer Portal guide, Auto-Generated Webhook URL, 1-Click Webhook Simulator, Live Webhook Traffic Inspector, and Render.com guide).
+4. **📺 Zero-to-Live OBS Setup Guide** (Interactive 6-step visual guide from zero to hearing TTS in OBS, with live connection verification).
+5. **📢 VIP Stream Tools & Activity Feed** (Live TTS Megaphone to speak custom messages on stream + Recent Followers history with 1-click **"🔄 Replay Alert"** buttons).
