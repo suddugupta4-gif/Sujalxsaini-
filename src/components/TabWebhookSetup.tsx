@@ -13,6 +13,7 @@ import {
   Square,
 } from 'lucide-react';
 import type { AppSettings, SetupChecklist } from '../types';
+import { PUBLIC_RENDER_ORIGIN } from '../utils/logic';
 
 interface TabWebhookSetupProps {
   settings: AppSettings;
@@ -29,14 +30,15 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
   const [simStatus, setSimStatus] = useState<string>('');
   const [isSendingSim, setIsSendingSim] = useState(false);
   const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
+  const [copiedRedirectUrl, setCopiedRedirectUrl] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [copiedHealth, setCopiedHealth] = useState(false);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(
     settings.webhookLogs[0]?.id || null
   );
 
-  const origin =
-    typeof window !== 'undefined' ? window.location.origin : 'https://sujalx-kick.onrender.com';
+  const origin = PUBLIC_RENDER_ORIGIN;
+  const redirectUrl = `${origin}/api/auth/kick/callback`;
   const webhookUrl = `${origin}/api/webhook/kick`;
   const healthUrl = `${origin}/api/health`;
 
@@ -70,6 +72,16 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
       },
     });
     setTimeout(() => setCopiedWebhookUrl(false), 2200);
+  };
+
+  const handleCopyRedirectUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(redirectUrl);
+    } catch {
+      // ignore
+    }
+    setCopiedRedirectUrl(true);
+    setTimeout(() => setCopiedRedirectUrl(false), 2200);
   };
 
   const handleCopyCurl = async () => {
@@ -138,15 +150,15 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
 
   return (
     <div className="space-y-8">
-      {/* Step 1: Auto-Generated Webhook Callback URL */}
-      <section className="rounded-xl bg-[#0D131C] border border-slate-800 p-6 space-y-4">
+      {/* Step 1: Auto-Generated Redirect URL & Webhook Callback URL */}
+      <section className="rounded-xl bg-[#0D131C] border border-slate-800 p-6 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="text-xs font-mono uppercase tracking-wider text-[#53FC18]">
-              01. Auto-Generated Kick Webhook Callback Endpoint
+              01. Kick Developer App URLs (Redirect URL + Webhook Callback URL)
             </div>
             <h2 className="text-xl font-bold text-white mt-0.5">
-              Official Kick Webhook Listener for kick.com/sujalxsaini
+              Paste Both URLs into Kick Developer Portal (kick.com/settings/developer)
             </h2>
           </div>
 
@@ -164,22 +176,79 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
           </button>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <input
-            type="text"
-            readOnly
-            aria-label="Kick Webhook Callback URL"
-            value={webhookUrl}
-            className="flex-1 rounded-lg bg-[#070A0F] border border-[#53FC18]/50 px-4 py-3 text-sm font-mono text-[#53FC18] focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={handleCopyWebhook}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#53FC18] hover:bg-[#45d912] text-slate-950 font-bold text-xs px-5 py-3 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            {copiedWebhookUrl ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            <span>{copiedWebhookUrl ? 'Webhook URL Copied!' : 'Copy Webhook URL'}</span>
-          </button>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Box A: Redirect URL */}
+          <div className="rounded-xl bg-[#080B11] border border-slate-800 p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-[#53FC18] uppercase">
+                A. Redirect URL (Paste in &ldquo;Redirect URI / Redirect URL&rdquo;)
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <input
+                type="text"
+                readOnly
+                aria-label="Kick Redirect URL"
+                value={redirectUrl}
+                className="flex-1 rounded-lg bg-[#05070B] border border-slate-700 px-3.5 py-2.5 text-xs font-mono text-white focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleCopyRedirectUrl}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[#53FC18] border border-[#53FC18]/50 font-bold text-xs px-4 py-2.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                {copiedRedirectUrl ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedRedirectUrl ? 'Redirect URL Copied!' : 'Copy Redirect URL'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Box B: Webhook Callback URL */}
+          <div className="rounded-xl bg-[#080B11] border border-[#53FC18]/40 p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-[#53FC18] uppercase">
+                B. Webhook URL (Paste in &ldquo;Webhook Callback URL&rdquo;)
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <input
+                type="text"
+                readOnly
+                aria-label="Kick Webhook Callback URL"
+                value={webhookUrl}
+                className="flex-1 rounded-lg bg-[#05070B] border border-[#53FC18]/50 px-3.5 py-2.5 text-xs font-mono text-[#53FC18] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleCopyWebhook}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#53FC18] hover:bg-[#45d912] text-slate-950 font-bold text-xs px-4 py-2.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                {copiedWebhookUrl ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedWebhookUrl ? 'Webhook URL Copied!' : 'Copy Webhook URL'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-xs">
+          <div className="rounded-lg bg-[#070A0F] border border-slate-800 p-3">
+            <div className="font-mono font-bold text-[#53FC18]">1. Follower Pop Alert + TTS</div>
+            <p className="text-slate-300 mt-0.5">
+              Fires your animated rectangle alert box with Follower PFP, Sound &amp; English/Hindi TTS voice.
+            </p>
+          </div>
+          <div className="rounded-lg bg-[#070A0F] border border-slate-800 p-3">
+            <div className="font-mono font-bold text-[#53FC18]">2. Real Follow Count (+1)</div>
+            <p className="text-slate-300 mt-0.5">
+              Automatically increments your real follower count (and syncs exact total if Kick sends <code className="text-[#53FC18]">followers_count</code>).
+            </p>
+          </div>
+          <div className="rounded-lg bg-[#070A0F] border border-slate-800 p-3">
+            <div className="font-mono font-bold text-[#53FC18]">3. Follow Goal Progress Bar</div>
+            <p className="text-slate-300 mt-0.5">
+              Animates the Follow Goal progress bar, updates the Recent Follower box, and fires Milestone Confetti at 100%.
+            </p>
+          </div>
         </div>
       </section>
 

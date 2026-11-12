@@ -27,9 +27,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   channelName: 'sujalxsaini',
   channelUrl: 'https://kick.com/sujalxsaini',
   pin: '1234',
-  followerCount: 1250,
-  followerGoal: 1500,
-  goalTitle: 'ROAD TO 1.5K FOLLOWERS',
+  followerCount: 463,
+  followerGoal: 500,
+  goalTitle: 'ROAD TO 500 FOLLOWERS',
   showGoalOnCounter: true,
   alertsPaused: false,
   alertsMuted: false,
@@ -250,6 +250,11 @@ async function startServer() {
     });
   });
 
+  // 1b. Kick Developer Portal OAuth Redirect Callback Endpoint
+  app.get('/api/auth/kick/callback', (_req: Request, res: Response) => {
+    res.redirect('/');
+  });
+
   // 2. Get Current State
   app.get('/api/state', (_req: Request, res: Response) => {
     res.json({
@@ -377,13 +382,150 @@ async function startServer() {
     res.json({ ok: true, settings: appState });
   });
 
-  // 5B. Auto-Detect Real Follower Count from Kick Channel API
+  // 5B. Official Kick OAuth 2.0 Client Credentials + Real-Time Follower & Webhook Sync
+  const KICK_CLIENT_ID =
+    process.env.KICK_CLIENT_ID || '01M78E5N4E4ZP8FFQS6FWPFH83';
+  const KICK_CLIENT_SECRET =
+    process.env.KICK_CLIENT_SECRET ||
+    '8cda2c6c2757de50761c8781dd920fe6192b409d783db19f341cfda01642970d';
+  const KICK_BROADCASTER_USER_ID = 30784872; // sujalxsaini
+
+  let cachedKickAccessToken = '';
+  let kickTokenExpiresAt = 0;
+
+  async function getKickAccessToken(): Promise<string | null> {
+    if (cachedKickAccessToken && Date.now() < kickTokenExpiresAt - 60_000) {
+      return cachedKickAccessToken;
+    }
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4500);
+      const tokenRes = await fetch('https://id.kick.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: KICK_CLIENT_ID,
+          client_secret: KICK_CLIENT_SECRET,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (tokenRes.ok) {
+        const data = (await tokenRes.json()) as {
+          access_token?: string;
+          expires_in?: number;
+        };
+        if (data.access_token) {
+          cachedKickAccessToken = data.access_token;
+          kickTokenExpiresAt =
+            Date.now() + (Number(data.expires_in) || 3600) * 1000;
+          return cachedKickAccessToken;
+        }
+      }
+    } catch {
+      // Ignore transient network errors
+    }
+    return null;
+  }
+
+  async function ensureKickWebhookSubscription(): Promise<void> {
+    const token = await getKickAccessToken();
+    if (!token) return;
+    try {
+      const getRes = await fetch(
+        'https://api.kick.com/public/v1/events/subscriptions',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        }
+      );
+      if (getRes.ok) {
+        const existing = (await getRes.json()) as {
+          data?: Array<{ name?: string; broadcaster_user_id?: number }>;
+        };
+        const alreadySubscribed = (existing.data || []).some(
+          (sub) =>
+            sub.name === 'channel.followed' &&
+            (!sub.broadcaster_user_id ||
+              sub.broadcaster_user_id === KICK_BROADCASTER_USER_ID)
+        );
+        if (alreadySubscribed) {
+          appState.setupChecklist.webhookStep2AppCreated = true;
+          appState.setupChecklist.webhookStep3SubscribedFollowed = true;
+          return;
+        }
+      }
+
+      const postRes = await fetch(
+        'https://api.kick.com/public/v1/events/subscriptions',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            broadcaster_user_id: KICK_BROADCASTER_USER_ID,
+            events: [{ name: 'channel.followed', version: 1 }],
+            method: 'webhook',
+          }),
+        }
+      );
+      if (postRes.ok) {
+        appState.setupChecklist.webhookStep2AppCreated = true;
+        appState.setupChecklist.webhookStep3SubscribedFollowed = true;
+        saveSettings(appState);
+      }
+    } catch {
+      // Ignore subscription check errors
+    }
+  }
+
+  async function fetchKickUserAvatar(username: string): Promise<string | undefined> {
+    const clean = (username || '').trim();
+    if (!clean) return undefined;
+    const token = await getKickAccessToken();
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(
+        `https://kick.com/api/v2/channels/${encodeURIComponent(clean)}`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = (await res.json()) as {
+          user?: { profile_pic?: string; profile_picture?: string };
+        };
+        const pic = data.user?.profile_pic || data.user?.profile_picture;
+        if (typeof pic === 'string' && pic.startsWith('http')) {
+          return pic;
+        }
+      }
+    } catch {
+      // Fallback to gamer SVG avatar
+    }
+    return undefined;
+  }
+
   async function syncKickChannelFollowers(slug = 'sujalxsaini'): Promise<{
     synced: boolean;
     followerCount: number;
     source: string;
   }> {
     const cleanSlug = (slug || appState.channelName || 'sujalxsaini').trim();
+    const token = await getKickAccessToken();
     const endpoints = [
       `https://kick.com/api/v2/channels/${encodeURIComponent(cleanSlug)}`,
       `https://kick.com/api/v1/channels/${encodeURIComponent(cleanSlug)}`,
@@ -392,12 +534,12 @@ async function startServer() {
     for (const url of endpoints) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 3500);
+        const timeout = setTimeout(() => controller.abort(), 6000);
         const resp = await fetch(url, {
           headers: {
-            Accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           },
           signal: controller.signal,
         });
@@ -411,18 +553,29 @@ async function startServer() {
               ? (data.livestream as Record<string, unknown>).followers_count
               : undefined);
           if (typeof rawCount === 'number' && Number.isFinite(rawCount) && rawCount >= 0) {
-            appState.followerCount = Math.round(rawCount);
-            saveSettings(appState);
-            broadcastEvent('SETTINGS_UPDATED', appState);
+            const nextCount = Math.round(rawCount);
+            const changed = appState.followerCount !== nextCount;
+            appState.followerCount = nextCount;
+            if (changed) {
+              saveSettings(appState);
+              broadcastEvent('SETTINGS_UPDATED', appState);
+              if (isMilestoneReached(appState.followerCount, appState.followerGoal)) {
+                broadcastEvent('MILESTONE_REACHED', {
+                  followerCount: appState.followerCount,
+                  followerGoal: appState.followerGoal,
+                  goalTitle: appState.goalTitle,
+                });
+              }
+            }
             return {
               synced: true,
               followerCount: appState.followerCount,
-              source: 'kick-live-api',
+              source: 'kick-live-oauth-api',
             };
           }
         }
       } catch {
-        // Fallback to tracked webhook follower count if Cloudflare blocks server fetch
+        // Fallback to next endpoint
       }
     }
 
@@ -510,7 +663,7 @@ async function startServer() {
   }
 
   // 6. Official Kick Webhook Endpoint (POST /api/webhook/kick)
-  app.post('/api/webhook/kick', (req: Request, res: Response) => {
+  app.post('/api/webhook/kick', async (req: Request, res: Response) => {
     const eventHeader =
       String(
         req.headers['kick-event-type'] ||
@@ -520,7 +673,7 @@ async function startServer() {
       ) || 'channel.followed';
 
     const username = extractFollowerUsername(req.body);
-    const avatarUrl = extractFollowerAvatar(req.body);
+    let avatarUrl = extractFollowerAvatar(req.body);
     const nowIso = new Date().toISOString();
 
     const sanitizedHeaders: Record<string, string> = {};
@@ -547,18 +700,31 @@ async function startServer() {
     appState.setupChecklist.webhookStep4SimulatedTest = true;
 
     const isSimulated = req.headers['x-sujalx-simulated'] === 'true';
+
+    // Respond 200 OK immediately so Kick never times out the webhook
+    res.status(200).json({
+      received: true,
+      event: eventHeader,
+      follower: username,
+      followerCount: appState.followerCount + 1,
+    });
+
+    // Fetch real follower PFP from Kick if not already in webhook payload
+    if (!avatarUrl && username && username !== 'KickUser') {
+      avatarUrl = await fetchKickUserAvatar(username);
+    }
+
     processFollowEvent(username, isSimulated ? 'simulator' : 'kick-webhook', true, {
       avatarUrl,
     });
     broadcastEvent('WEBHOOK_RECEIVED', logEntry);
 
-    // Always respond 200 OK immediately so Kick never disables the webhook
-    res.status(200).json({
-      received: true,
-      event: eventHeader,
-      follower: username,
-      followerCount: appState.followerCount,
-    });
+    // Sync exact real follower total from Kick API right after a real webhook
+    if (!isSimulated) {
+      setTimeout(() => {
+        syncKickChannelFollowers(appState.channelName).catch(() => {});
+      }, 1500);
+    }
   });
 
   // 7. Webhook Simulator Endpoint (POST /api/webhook/simulate)
@@ -569,7 +735,7 @@ async function startServer() {
     const simulatedPayload = {
       event: 'channel.followed',
       channel: {
-        id: 948201,
+        id: 29740496,
         slug: appState.channelName || 'sujalxsaini',
         url: appState.channelUrl || 'https://kick.com/sujalxsaini',
       },
@@ -765,6 +931,13 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`SujalX Kick Studio running at http://0.0.0.0:${PORT}`);
+    // Immediately sync real followers from Kick OAuth API & register webhook subscription
+    syncKickChannelFollowers(appState.channelName).catch(() => {});
+    ensureKickWebhookSubscription().catch(() => {});
+    // Real-time background follower count sync every 8 seconds
+    setInterval(() => {
+      syncKickChannelFollowers(appState.channelName).catch(() => {});
+    }, 8000);
   });
 }
 

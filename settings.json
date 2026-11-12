@@ -2,12 +2,12 @@
   "channelName": "sujalxsaini",
   "channelUrl": "https://kick.com/sujalxsaini",
   "pin": "1234",
-  "followerCount": 1251,
-  "followerGoal": 2000,
-  "goalTitle": "ROAD TO 2,000 FOLLOWERS",
+  "followerCount": 463,
+  "followerGoal": 500,
+  "goalTitle": "ROAD TO 500 FOLLOWERS",
   "showGoalOnCounter": true,
   "alertsPaused": false,
-  "alertsMuted": false,
+  "alertsMuted": true,
   "activeAlertTemplate": "neon",
   "activeCounterTemplate": "neon",
   "selectedFont": "Rajdhani",
@@ -16,13 +16,13 @@
   "sfxPreset": "cyber",
   "customSfxUrl": "",
   "ttsSettings": {
-    "enabled": true,
+    "enabled": false,
     "mode": "stream",
     "lang": "hi-IN",
     "messageTemplate": "{username} started following",
-    "rate": 1.1,
+    "rate": 1,
     "pitch": 1,
-    "volume": 1
+    "volume": 0.1
   },
   "recentFollowers": [
     {

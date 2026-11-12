@@ -215,6 +215,8 @@ export function formatTtsMessage(template: string, username: string, channelName
     .replace(/\{channel\}/gi, channelName);
 }
 
+export const PUBLIC_RENDER_ORIGIN = 'https://sujalx-kick-studio.onrender.com';
+
 export function buildObsAlertUrl(
   origin: string,
   params: {
@@ -228,7 +230,7 @@ export function buildObsAlertUrl(
     volume?: number;
   }
 ): string {
-  const cleanOrigin = origin.replace(/\/+$/, '');
+  const cleanOrigin = (origin || PUBLIC_RENDER_ORIGIN).replace(/\/+$/, '');
   const searchParams = new URLSearchParams();
   searchParams.set('obs', 'alerts');
   searchParams.set('template', params.template);

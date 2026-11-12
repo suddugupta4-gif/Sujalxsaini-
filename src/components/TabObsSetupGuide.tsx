@@ -13,6 +13,7 @@ import {
 import type { AppSettings, ObsClientCounts, SetupChecklist } from '../types';
 import {
   OBS_CUSTOM_CSS,
+  PUBLIC_RENDER_ORIGIN,
   buildObsAlertUrl,
   buildObsCounterUrl,
 } from '../utils/logic';
@@ -35,8 +36,7 @@ export const TabObsSetupGuide: React.FC<TabObsSetupGuideProps> = ({
   const [copiedCss, setCopiedCss] = useState(false);
   const [testSentMessage, setTestSentMessage] = useState('');
 
-  const origin =
-    typeof window !== 'undefined' ? window.location.origin : 'https://sujalx-kick.onrender.com';
+  const origin = PUBLIC_RENDER_ORIGIN;
 
   const alertsUrl = buildObsAlertUrl(origin, {
     template: settings.activeAlertTemplate,

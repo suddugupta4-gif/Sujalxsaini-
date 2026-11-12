@@ -19,6 +19,7 @@ import type {
 } from '../types';
 import {
   GOOGLE_FONTS,
+  PUBLIC_RENDER_ORIGIN,
   buildObsCounterUrl,
   calculateGoalPercentage,
 } from '../utils/logic';
@@ -82,10 +83,7 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
     });
   }, []);
 
-  const origin =
-    typeof window !== 'undefined'
-      ? window.location.origin
-      : 'https://sujalx-kick.onrender.com';
+  const origin = PUBLIC_RENDER_ORIGIN;
 
   const activeFont = settings.counterFont || settings.selectedFont || 'Orbitron';
 

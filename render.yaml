@@ -13,5 +13,9 @@ services:
         value: 3000
       - key: KICK_CHANNEL_SLUG
         value: sujalxsaini
+      - key: KICK_CLIENT_ID
+        value: 01M78E5N4E4ZP8FFQS6FWPFH83
+      - key: KICK_CLIENT_SECRET
+        value: 8cda2c6c2757de50761c8781dd920fe6192b409d783db19f341cfda01642970d
       - key: ADMIN_PIN
         value: "1234"

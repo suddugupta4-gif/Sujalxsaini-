@@ -23,6 +23,7 @@ import type {
 } from '../types';
 import {
   GOOGLE_FONTS,
+  PUBLIC_RENDER_ORIGIN,
   TTS_LANGUAGES,
   buildObsAlertUrl,
   formatTtsMessage,
@@ -67,8 +68,7 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
   const [copiedInlineLink, setCopiedInlineLink] = useState(false);
   const linkGeneratorRef = useRef<HTMLDivElement | null>(null);
 
-  const origin =
-    typeof window !== 'undefined' ? window.location.origin : 'https://sujalx-kick.onrender.com';
+  const origin = PUBLIC_RENDER_ORIGIN;
 
   const generatedAlertUrl = buildObsAlertUrl(origin, {
     template: settings.activeAlertTemplate,
