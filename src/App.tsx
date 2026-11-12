@@ -32,6 +32,7 @@ import { TabCounterStudio } from './components/TabCounterStudio';
 import { TabWebhookSetup } from './components/TabWebhookSetup';
 import { TabObsSetupGuide } from './components/TabObsSetupGuide';
 import { TabVipToolsFeed } from './components/TabVipToolsFeed';
+import { AlertCardRenderer } from './components/AlertCardTemplates';
 
 type DashboardTabId =
   | 'alerts'
@@ -44,9 +45,9 @@ const FALLBACK_SETTINGS: AppSettings = {
   channelName: 'sujalxsaini',
   channelUrl: 'https://kick.com/sujalxsaini',
   pin: '1234',
-  followerCount: 1250,
-  followerGoal: 1500,
-  goalTitle: 'ROAD TO 1.5K FOLLOWERS',
+  followerCount: 463,
+  followerGoal: 500,
+  goalTitle: 'ROAD TO 500 FOLLOWERS',
   showGoalOnCounter: true,
   alertsPaused: false,
   alertsMuted: false,
@@ -117,6 +118,8 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
   });
   const [bannerStatus, setBannerStatus] = useState<string>('');
   const [previewUsername, setPreviewUsername] = useState<string>('RohanGamingIN');
+  const [liveDashboardAlert, setLiveDashboardAlert] =
+    useState<FollowAlertPayload | null>(null);
 
   useEffect(() => {
     fetch('/api/state')
@@ -139,6 +142,17 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
           setSettings(data);
         } else if (type === 'OBS_STATUS_CHANGED') {
           setObsCounts(data);
+        } else if (type === 'FOLLOW_ALERT') {
+          const alert = data as FollowAlertPayload;
+          if (alert.source === 'kick-webhook' || alert.source === 'simulator') {
+            setLiveDashboardAlert(alert);
+            setPreviewUsername(alert.username);
+            setTimeout(() => {
+              setLiveDashboardAlert((curr) =>
+                curr?.id === alert.id ? null : curr
+              );
+            }, (alert.duration || 7) * 1000);
+          }
         } else if (type === 'WEBHOOK_RECEIVED') {
           const log = data as WebhookLogEntry;
           setSettings((prev) => ({
@@ -149,9 +163,9 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
             ],
           }));
           setBannerStatus(
-            `Incoming Kick Webhook: ${log.username} followed sujalxsaini!`
+            `Incoming Kick Follow: ${log.username} followed sujalxsaini!`
           );
-          setTimeout(() => setBannerStatus(''), 4000);
+          setTimeout(() => setBannerStatus(''), 5000);
         } else if (type === 'MILESTONE_REACHED') {
           try {
             confetti({
@@ -531,12 +545,44 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
         </div>
       </div>
 
+      {settings.alertsPaused && (
+        <div
+          role="alert"
+          className="bg-amber-500/20 border-b border-amber-400/60 px-6 py-2.5 flex flex-wrap items-center justify-center gap-3 text-xs font-mono text-amber-200"
+        >
+          <span>
+            ⚠️ Alert Queue is currently <strong>PAUSED</strong> — real Kick follow alerts will wait until resumed.
+          </span>
+          <button
+            type="button"
+            onClick={() => handleQueueControl('resume')}
+            className="px-3 py-1 rounded bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold cursor-pointer"
+          >
+            Resume Alerts Now
+          </button>
+        </div>
+      )}
+
       {bannerStatus && (
         <div
           role="status"
           className="bg-[#53FC18]/15 border-b border-[#53FC18]/40 px-6 py-2 text-center text-xs font-mono text-[#53FC18]"
         >
           {bannerStatus}
+        </div>
+      )}
+
+      {liveDashboardAlert && (
+        <div className="fixed bottom-6 right-6 z-50 pointer-events-none max-w-md w-full px-4">
+          <AlertCardRenderer
+            template={liveDashboardAlert.template || settings.activeAlertTemplate}
+            font={liveDashboardAlert.font || settings.selectedFont}
+            username={liveDashboardAlert.username}
+            avatarUrl={liveDashboardAlert.avatarUrl || settings.customAvatarUrl}
+            ttsMessage={liveDashboardAlert.ttsMessage}
+            isSpeaking={true}
+            compact={true}
+          />
         </div>
       )}
 

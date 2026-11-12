@@ -33,8 +33,14 @@ export const ObsAlertsOverlay: React.FC = () => {
   const mutedRef = useRef(false);
   const settingsRef = useRef<AppSettings | null>(null);
   const clearTimerRef = useRef<number | null>(null);
+  const activeAlertRef = useRef<FollowAlertPayload | null>(null);
+  const seenAlertIdsRef = useRef<Set<string>>(new Set());
 
   const queryOverrides = parseObsQueryOverrides(window.location.search, settings || undefined);
+
+  useEffect(() => {
+    activeAlertRef.current = activeAlert;
+  }, [activeAlert]);
 
   useEffect(() => {
     // Enforce 100% transparent background for OBS Studio Browser Source
@@ -76,11 +82,14 @@ export const ObsAlertsOverlay: React.FC = () => {
   };
 
   const processNextInQueue = async () => {
-    if (processingRef.current || pausedRef.current) return;
+    if (processingRef.current) return;
+    // Allow queued alerts unless explicitly paused, and never block real kick-webhook alerts silently if queue was paused before reload
+    if (pausedRef.current) return;
     const nextAlert = queueRef.current.shift();
     if (!nextAlert) return;
 
     processingRef.current = true;
+    seenAlertIdsRef.current.add(nextAlert.id);
     setActiveAlert(nextAlert);
     triggerConfettiBurst(false);
 
@@ -92,7 +101,24 @@ export const ObsAlertsOverlay: React.FC = () => {
     const ttsVoice = nextAlert.ttsLang || overrides.voice;
     const isMuted = mutedRef.current || Boolean(currentSettings?.alertsMuted);
 
-    await playSynthesizedSfx(sfxToPlay, currentSettings?.customSfxUrl, isMuted);
+    if (clearTimerRef.current) {
+      window.clearTimeout(clearTimerRef.current);
+    }
+
+    clearTimerRef.current = window.setTimeout(() => {
+      setIsSpeaking(false);
+      setActiveAlert(null);
+      processingRef.current = false;
+      setTimeout(() => {
+        processNextInQueue();
+      }, 350);
+    }, durationSec * 1000);
+
+    try {
+      await playSynthesizedSfx(sfxToPlay, currentSettings?.customSfxUrl, isMuted);
+    } catch {
+      // Ignore SFX errors in autoplay-restricted contexts
+    }
 
     if (ttsAllowed && !isMuted) {
       const msg =
@@ -118,19 +144,23 @@ export const ObsAlertsOverlay: React.FC = () => {
         });
       }, 420);
     }
+  };
 
-    if (clearTimerRef.current) {
-      window.clearTimeout(clearTimerRef.current);
+  const enqueueAndPlayAlert = (payload: FollowAlertPayload) => {
+    if (seenAlertIdsRef.current.has(payload.id)) return;
+    seenAlertIdsRef.current.add(payload.id);
+
+    // If only the initial demo card is showing, preempt it immediately for a real alert!
+    if (activeAlertRef.current?.id.startsWith('init-')) {
+      if (clearTimerRef.current) {
+        window.clearTimeout(clearTimerRef.current);
+      }
+      processingRef.current = false;
+      setActiveAlert(null);
     }
 
-    clearTimerRef.current = window.setTimeout(() => {
-      setIsSpeaking(false);
-      setActiveAlert(null);
-      processingRef.current = false;
-      setTimeout(() => {
-        processNextInQueue();
-      }, 350);
-    }, durationSec * 1000);
+    queueRef.current.push(payload);
+    processNextInQueue();
   };
 
   const initialShownRef = useRef(false);
@@ -142,7 +172,7 @@ export const ObsAlertsOverlay: React.FC = () => {
         username: 'RohanGamingIN',
         timestamp: new Date().toISOString(),
         source: 'test',
-        followerCount: 1251,
+        followerCount: 463,
         template: queryOverrides.alertTemplate,
         font: queryOverrides.font,
         sfxPreset: queryOverrides.sfx,
@@ -170,11 +200,16 @@ export const ObsAlertsOverlay: React.FC = () => {
           mutedRef.current = Boolean(data.settings?.alertsMuted);
           setSettings(data.settings);
 
+          // Mark existing followers as seen so only future follows trigger alerts
+          (data.settings?.recentFollowers || []).forEach((rf: { id?: string }) => {
+            if (rf.id) seenAlertIdsRef.current.add(rf.id);
+          });
+
           // Automatically show the latest follower alert on initial OBS connect so the box & text are immediately visible
           if (!initialShownRef.current && !queryOverrides.previewMode) {
             initialShownRef.current = true;
-            const latestUser =
-              data.settings?.recentFollowers?.[0]?.username || 'RohanGamingIN';
+            const latestFollower = data.settings?.recentFollowers?.[0];
+            const latestUser = latestFollower?.username || 'RohanGamingIN';
             const overrides = parseObsQueryOverrides(
               window.location.search,
               data.settings
@@ -182,9 +217,10 @@ export const ObsAlertsOverlay: React.FC = () => {
             const initAlert: FollowAlertPayload = {
               id: `init-${Date.now()}`,
               username: latestUser,
+              avatarUrl: latestFollower?.avatarUrl || data.settings?.customAvatarUrl,
               timestamp: new Date().toISOString(),
               source: 'test',
-              followerCount: data.settings?.followerCount || 1251,
+              followerCount: data.settings?.followerCount || 463,
               template: overrides.alertTemplate,
               font: overrides.font,
               sfxPreset: overrides.sfx,
@@ -205,8 +241,7 @@ export const ObsAlertsOverlay: React.FC = () => {
             processNextInQueue();
           }
         } else if (type === 'FOLLOW_ALERT') {
-          queueRef.current.push(data as FollowAlertPayload);
-          processNextInQueue();
+          enqueueAndPlayAlert(data as FollowAlertPayload);
         } else if (type === 'CUSTOM_TTS_ANNOUNCE') {
           const payload = data as CustomTtsPayload;
           setActiveMegaphone(payload);
@@ -253,8 +288,57 @@ export const ObsAlertsOverlay: React.FC = () => {
       }
     };
 
+    // Fallback poll every 4 seconds so even if SSE briefly disconnects, real Kick follows never get missed
+    const pollTimer = window.setInterval(async () => {
+      try {
+        const res = await fetch('/api/state');
+        if (!res.ok) return;
+        const json = await res.json();
+        const latestSettings = json?.settings as AppSettings | undefined;
+        if (!latestSettings) return;
+        settingsRef.current = latestSettings;
+        pausedRef.current = Boolean(latestSettings.alertsPaused);
+        mutedRef.current = Boolean(latestSettings.alertsMuted);
+
+        const latestFollower = latestSettings.recentFollowers?.[0];
+        if (
+          latestFollower &&
+          latestFollower.id &&
+          !seenAlertIdsRef.current.has(latestFollower.id) &&
+          Date.now() - new Date(latestFollower.timestamp).getTime() < 30_000
+        ) {
+          const overrides = parseObsQueryOverrides(
+            window.location.search,
+            latestSettings
+          );
+          enqueueAndPlayAlert({
+            id: latestFollower.id,
+            username: latestFollower.username,
+            avatarUrl: latestFollower.avatarUrl || latestSettings.customAvatarUrl,
+            timestamp: latestFollower.timestamp,
+            source: latestFollower.source,
+            followerCount: latestSettings.followerCount,
+            template: overrides.alertTemplate,
+            font: overrides.font,
+            sfxPreset: overrides.sfx,
+            duration: overrides.duration,
+            ttsEnabled: overrides.ttsEnabled,
+            ttsLang: overrides.voice,
+            ttsMessage: formatTtsMessage(
+              latestSettings.ttsSettings.messageTemplate,
+              latestFollower.username,
+              latestSettings.channelName
+            ),
+          });
+        }
+      } catch {
+        // Ignore transient poll errors
+      }
+    }, 4000);
+
     return () => {
       es.close();
+      window.clearInterval(pollTimer);
     };
   }, []);
 

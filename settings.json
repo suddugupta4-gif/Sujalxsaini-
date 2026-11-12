@@ -2,7 +2,7 @@
   "channelName": "sujalxsaini",
   "channelUrl": "https://kick.com/sujalxsaini",
   "pin": "1234",
-  "followerCount": 463,
+  "followerCount": 462,
   "followerGoal": 500,
   "goalTitle": "ROAD TO 500 FOLLOWERS",
   "showGoalOnCounter": true,
@@ -25,6 +25,13 @@
     "volume": 0.1
   },
   "recentFollowers": [
+    {
+      "id": "fol-1794507537516-cu4o",
+      "username": "ShooterSainiisLive",
+      "timestamp": "2026-11-12T18:18:57.516Z",
+      "source": "kick-webhook",
+      "avatarUrl": "https://files.kick.com/images/user/110082926/profile_image/conversion/default1-medium.webp"
+    },
     {
       "id": "fol-1794496172944-m19s",
       "username": "AaravSniper_IN",
@@ -57,6 +64,78 @@
     }
   ],
   "webhookLogs": [
+    {
+      "id": "wh-1794507537516-dmqs",
+      "timestamp": "2026-11-12T18:18:57.516Z",
+      "eventType": "channel.followed",
+      "username": "ShooterSainiisLive",
+      "status": 200,
+      "headers": {
+        "host": "localhost:3000",
+        "connection": "keep-alive",
+        "content-length": "237",
+        "sec-ch-ua-platform": "\"Linux\"",
+        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.8059.12 Safari/537.36",
+        "sec-ch-ua": "\"HeadlessChrome\";v=\"155\", \"Chromium\";v=\"155\", \"Not(A:Brand\";v=\"24\"",
+        "kick-event-type": "channel.followed",
+        "content-type": "application/json",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://localhost:3000",
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://localhost:3000/?obs=alerts&template=neon&font=Rajdhani&tts=1&voice=hi-IN&sfx=arcade&duration=4&rate=1.2&volume=1",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "payload": {
+        "broadcaster": {
+          "user_id": 30784872,
+          "username": "sujalxsaini"
+        },
+        "follower": {
+          "user_id": 110082926,
+          "username": "ShooterSainiisLive",
+          "profile_picture": "https://files.kick.com/images/user/110082926/profile_image/conversion/default1-medium.webp"
+        }
+      }
+    },
+    {
+      "id": "wh-1794507521551-7r40",
+      "timestamp": "2026-11-12T18:18:41.550Z",
+      "eventType": "channel.followed",
+      "username": "ShooterSainiisLive",
+      "status": 200,
+      "headers": {
+        "host": "localhost:3000",
+        "connection": "keep-alive",
+        "content-length": "237",
+        "sec-ch-ua-platform": "\"Linux\"",
+        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.8059.12 Safari/537.36",
+        "sec-ch-ua": "\"HeadlessChrome\";v=\"155\", \"Chromium\";v=\"155\", \"Not(A:Brand\";v=\"24\"",
+        "kick-event-type": "channel.followed",
+        "content-type": "application/json",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "origin": "http://localhost:3000",
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": "http://localhost:3000/?obs=alerts&template=neon&font=Rajdhani&tts=1&voice=hi-IN&sfx=arcade&duration=4&rate=1.2&volume=1",
+        "accept-encoding": "gzip, deflate, br, zstd"
+      },
+      "payload": {
+        "broadcaster": {
+          "user_id": 30784872,
+          "username": "sujalxsaini"
+        },
+        "follower": {
+          "user_id": 110082926,
+          "username": "ShooterSainiisLive",
+          "profile_picture": "https://files.kick.com/images/user/110082926/profile_image/conversion/default1-medium.webp"
+        }
+      }
+    },
     {
       "id": "wh-1794496172944-6ra6",
       "timestamp": "2026-11-12T15:09:32.944Z",
@@ -154,8 +233,8 @@
     "obsStep5MonitorAndOutput": false,
     "obsStep6VerifiedLive": false,
     "webhookStep1UrlCopied": true,
-    "webhookStep2AppCreated": false,
-    "webhookStep3SubscribedFollowed": false,
+    "webhookStep2AppCreated": true,
+    "webhookStep3SubscribedFollowed": true,
     "webhookStep4SimulatedTest": true,
     "webhookStep5RenderDeployed": false
   },
