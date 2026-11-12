@@ -475,10 +475,10 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
               01. Render Build Command
             </div>
             <code className="block bg-[#05070B] border border-slate-800 rounded px-3 py-2 font-mono text-white">
-              npm install --include=dev &amp;&amp; npm run build
+              npm install --include=dev --legacy-peer-deps &amp;&amp; npm run build
             </code>
             <p className="text-slate-400">
-              Installs TypeScript/Vite build tools and compiles the React 19 frontend into /dist.
+              Bypasses npm peer-dependency conflicts (esbuild/vite) and compiles /dist.
             </p>
           </div>
 
