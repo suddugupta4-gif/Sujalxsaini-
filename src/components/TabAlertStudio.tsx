@@ -3,11 +3,9 @@ import {
   Flame,
   Volume2,
   Zap,
-  Music,
   Type,
   Check,
   Sparkles,
-  Play,
   UserCheck,
   Copy,
   Save,
@@ -19,7 +17,6 @@ import type {
   AppSettings,
   FontFamilyName,
   ObsClientCounts,
-  SfxPresetId,
   TtsLangCode,
 } from '../types';
 import {
@@ -29,11 +26,7 @@ import {
   buildObsAlertUrl,
   formatTtsMessage,
 } from '../utils/logic';
-import {
-  SFX_PRESET_INFO,
-  playSynthesizedSfx,
-  speakAlertTts,
-} from '../utils/soundEngine';
+import { speakAlertTts } from '../utils/soundEngine';
 import { ALERT_TEMPLATES, AlertCardRenderer } from './AlertCardTemplates';
 import { ObsLinkGeneratorPanel } from './ObsLinkGeneratorModal';
 
@@ -85,7 +78,6 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
     font: settings.selectedFont,
     tts: settings.ttsSettings.enabled,
     voice: settings.ttsSettings.lang,
-    sfx: settings.sfxPreset,
     duration: settings.alertDuration,
     rate: settings.ttsSettings.rate,
     volume: settings.ttsSettings.volume,
@@ -94,10 +86,6 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
   const activeTemplateMeta =
     ALERT_TEMPLATES.find((t) => t.id === settings.activeAlertTemplate) ||
     ALERT_TEMPLATES[0];
-
-  const activeSfxMeta =
-    SFX_PRESET_INFO.find((s) => s.id === settings.sfxPreset) ||
-    SFX_PRESET_INFO[0];
 
   const activeVoiceMeta =
     TTS_LANGUAGES.find((l) => l.code === settings.ttsSettings.lang) ||
@@ -129,7 +117,7 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
     await onUpdateSettings({
       activeAlertTemplate: settings.activeAlertTemplate,
       selectedFont: settings.selectedFont,
-      sfxPreset: settings.sfxPreset,
+      sfxPreset: 'none',
       alertDuration: settings.alertDuration,
       ttsSettings: {
         ...settings.ttsSettings,
@@ -166,11 +154,6 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
   };
 
   const handleLocalVoicePreview = async () => {
-    await playSynthesizedSfx(
-      settings.sfxPreset,
-      settings.customSfxUrl,
-      settings.alertsMuted
-    );
     if (settings.ttsSettings.enabled) {
       await speakAlertTts({
         text: previewTtsMessage,
@@ -292,10 +275,10 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
             <div>
               <div className="text-[11px] font-mono uppercase tracking-wider text-[#53FC18]">
-                All-in-One Alert &amp; TTS Settings · Auto-Generates Single Unified OBS Link
+                All-in-One Alert &amp; TTS Settings · Live Updates Even on Existing OBS Links
               </div>
               <h3 className="text-base font-bold text-white mt-0.5">
-                Select Template, Music, Font, Duration, Speed, Volume &amp; English / Hindi Accent
+                Select Template, Font, Duration, Speed, Volume &amp; English / Hindi Accent
               </h3>
             </div>
 
@@ -310,8 +293,8 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
             </button>
           </div>
 
-          {/* 7-Control Unified Selector Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* 6-Control Unified Selector Grid (No Follow Sound Effect — Sound Effects are Kicks & Subs Only) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             {/* 1. Template Selector */}
             <div className="rounded-lg bg-[#05080D] border border-slate-800 p-3 space-y-1.5">
               <label
@@ -339,49 +322,13 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
               </select>
             </div>
 
-            {/* 2. Music / Sound (SFX) Selector */}
-            <div className="rounded-lg bg-[#05080D] border border-slate-800 p-3 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label
-                  htmlFor="quick-select-sfx"
-                  className="block text-[11px] font-mono uppercase text-slate-400"
-                >
-                  2. Alert Music / Sound
-                </label>
-                <button
-                  type="button"
-                  onClick={() => playSynthesizedSfx(settings.sfxPreset, settings.customSfxUrl)}
-                  className="text-[10px] font-mono text-[#53FC18] hover:underline cursor-pointer"
-                >
-                  Test Sound
-                </button>
-              </div>
-              <select
-                id="quick-select-sfx"
-                value={settings.sfxPreset}
-                onChange={(e) => {
-                  const sfx = e.target.value as SfxPresetId;
-                  onUpdateSettings({ sfxPreset: sfx });
-                  playSynthesizedSfx(sfx, settings.customSfxUrl);
-                  setSavedSingleLinkBanner(true);
-                }}
-                className="w-full rounded bg-[#0B1018] border border-slate-700 px-2.5 py-2 text-xs font-semibold text-white focus:outline-none focus:border-[#53FC18]"
-              >
-                {SFX_PRESET_INFO.map((preset) => (
-                  <option key={preset.id} value={preset.id}>
-                    {preset.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* 3. Font Family Selector */}
+            {/* 2. Font Family Selector */}
             <div className="rounded-lg bg-[#05080D] border border-slate-800 p-3 space-y-1.5">
               <label
                 htmlFor="quick-select-font"
                 className="block text-[11px] font-mono uppercase text-slate-400"
               >
-                3. Broadcast Font
+                2. Broadcast Font
               </label>
               <select
                 id="quick-select-font"
@@ -402,14 +349,14 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
               </select>
             </div>
 
-            {/* 4. English & Hindi Voice Accent Selector */}
+            {/* 3. English & Hindi Voice Accent Selector */}
             <div className="rounded-lg bg-[#05080D] border border-slate-800 p-3 space-y-1.5">
               <div className="flex items-center justify-between gap-1">
                 <label
                   htmlFor="quick-select-voice"
                   className="block text-[11px] font-mono uppercase text-slate-400"
                 >
-                  4. Voice Accent (EN / HI)
+                  3. Voice Accent (EN / HI)
                 </label>
                 <div className="flex items-center gap-1">
                   <button
@@ -499,11 +446,11 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
 
           {/* Sliders Row: Alert Duration, TTS Speed, TTS Volume */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-            {/* 5. Alert Duration */}
+            {/* 4. Alert Duration */}
             <div className="rounded-lg bg-[#05080D] border border-slate-800 p-3">
               <div className="flex justify-between text-xs mb-1.5">
                 <span className="font-mono text-[11px] uppercase text-slate-400">
-                  5. Alert Duration
+                  4. Alert Duration
                 </span>
                 <span className="font-mono font-bold text-[#53FC18]">
                   {settings.alertDuration}s
@@ -524,11 +471,11 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
               />
             </div>
 
-            {/* 6. TTS Voice Speed */}
+            {/* 5. TTS Voice Speed */}
             <div className="rounded-lg bg-[#05080D] border border-slate-800 p-3">
               <div className="flex justify-between text-xs mb-1.5">
                 <span className="font-mono text-[11px] uppercase text-slate-400">
-                  6. TTS Voice Speed
+                  5. TTS Voice Speed
                 </span>
                 <span className="font-mono font-bold text-[#53FC18]">
                   {settings.ttsSettings.rate.toFixed(1)}x
@@ -554,11 +501,11 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
               />
             </div>
 
-            {/* 7. TTS Volume */}
+            {/* 6. TTS Volume */}
             <div className="rounded-lg bg-[#05080D] border border-slate-800 p-3">
               <div className="flex justify-between text-xs mb-1.5">
                 <span className="font-mono text-[11px] uppercase text-slate-400">
-                  7. TTS Voice Volume
+                  6. TTS Voice Volume
                 </span>
                 <span className="font-mono font-bold text-[#53FC18]">
                   {Math.round(settings.ttsSettings.volume * 100)}%
@@ -585,18 +532,18 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
             </div>
           </div>
 
-          {/* Auto-Generated Single Unified OBS URL Box (Includes Template + Music + Font + Duration + Speed + Volume + Accent) */}
+          {/* Auto-Generated Single Unified OBS URL Box (Includes Template + Font + Duration + Speed + Volume + Accent) */}
           <div className="rounded-lg bg-[#05070B] border border-[#53FC18]/50 p-3.5 space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-xs font-bold text-white">
                 <Link2 className="w-4 h-4 text-[#53FC18]" />
                 <span>
-                  Single Unified OBS Link (All Applied Settings Combined in 1 Link):
+                  Single Unified OBS Link (Live Settings Sync Automatically — No Link Regeneration Needed):
                 </span>
               </div>
               {savedSingleLinkBanner && (
                 <span className="text-[11px] font-mono font-bold text-[#53FC18]">
-                  ✓ Settings Saved &amp; Link Auto-Updated!
+                  ✓ Settings Saved &amp; Synced Live to Existing OBS Links!
                 </span>
               )}
             </div>
@@ -605,9 +552,6 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
               <span className="px-2 py-0.5 rounded bg-[#53FC18]/15 border border-[#53FC18]/40 text-[#53FC18]">
                 Template: {activeTemplateMeta.name}
-              </span>
-              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-200">
-                Music: {activeSfxMeta.name}
               </span>
               <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-200">
                 Font: {settings.selectedFont}
@@ -792,143 +736,58 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
         </div>
       </section>
 
-      {/* 8 Selectable Google Fonts + 6 Polyphonic Sound Presets */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 8 Google Fonts Selector */}
-        <section className="rounded-xl bg-[#0D131C] border border-slate-800 p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-2.5">
-              <Type className="w-5 h-5 text-[#53FC18]" />
-              <div>
-                <h3 className="text-base font-bold text-white">
-                  8 Premium Broadcast Google Fonts
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Instantly updates follower typography across OBS overlays
-                </p>
-              </div>
+      {/* 8 Selectable Broadcast Google Fonts (Full-Width Clean Grid — Follow Alerts Have Zero SFX) */}
+      <section className="rounded-xl bg-[#0D131C] border border-slate-800 p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <Type className="w-5 h-5 text-[#53FC18]" />
+            <div>
+              <h3 className="text-base font-bold text-white">
+                8 Premium Broadcast Google Fonts
+              </h3>
+              <p className="text-xs text-slate-400">
+                Instantly updates follower typography across live OBS overlays without changing links
+              </p>
             </div>
-            <span className="text-xs font-mono text-[#53FC18]">
-              Active: {settings.selectedFont}
-            </span>
           </div>
+          <span className="text-xs font-mono text-[#53FC18]">
+            Active: {settings.selectedFont}
+          </span>
+        </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {GOOGLE_FONTS.map((f) => {
-              const active = settings.selectedFont === f.name;
-              return (
-                <button
-                  key={f.name}
-                  type="button"
-                  onClick={() => {
-                    onUpdateSettings({ selectedFont: f.name });
-                    setSavedSingleLinkBanner(true);
-                  }}
-                  className={`text-left rounded-lg p-3 border transition-all cursor-pointer ${
-                    active
-                      ? 'bg-[#53FC18]/12 border-[#53FC18] text-white'
-                      : 'bg-[#080B11] border-slate-800 hover:border-slate-700 text-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1">
-                    <span>{f.name}</span>
-                    <span>{f.styleTag}</span>
-                  </div>
-                  <div
-                    className="text-sm font-bold whitespace-nowrap overflow-hidden text-ellipsis"
-                    style={{ fontFamily: `'${f.name}', sans-serif` }}
-                  >
-                    <span className="text-[#53FC18]">{activeUserDisplay}</span>{' '}
-                    <span className="text-white">started following</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* 6 Polyphonic Web Audio API Sound Effect Presets */}
-        <section className="rounded-xl bg-[#0D131C] border border-slate-800 p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-2.5">
-              <Music className="w-5 h-5 text-[#53FC18]" />
-              <div>
-                <h3 className="text-base font-bold text-white">
-                  6 Synthesized Polyphonic Alert Sound Presets
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Zero-latency Web Audio API synthesizer chimes played before TTS
-                </p>
-              </div>
-            </div>
-            <span className="text-xs font-mono text-[#53FC18] uppercase">
-              SFX: {settings.sfxPreset}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {SFX_PRESET_INFO.map((preset) => {
-              const active = settings.sfxPreset === preset.id;
-              return (
-                <div
-                  key={preset.id}
-                  className={`rounded-lg p-3 border flex items-center justify-between gap-2 ${
-                    active
-                      ? 'bg-[#53FC18]/12 border-[#53FC18]'
-                      : 'bg-[#080B11] border-slate-800'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onUpdateSettings({ sfxPreset: preset.id as SfxPresetId });
-                      setSavedSingleLinkBanner(true);
-                    }}
-                    className="text-left min-w-0 flex-1 cursor-pointer"
-                  >
-                    <div className="text-xs font-bold text-white truncate">
-                      {preset.name}
-                    </div>
-                    <div className="text-[11px] text-slate-400 truncate">
-                      {preset.description}
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onUpdateSettings({ sfxPreset: preset.id as SfxPresetId });
-                      setSavedSingleLinkBanner(true);
-                      playSynthesizedSfx(preset.id);
-                    }}
-                    aria-label={`Audition ${preset.name}`}
-                    className="px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-[#53FC18] text-xs font-mono font-semibold inline-flex items-center gap-1 shrink-0 cursor-pointer"
-                  >
-                    <Play className="w-3 h-3" />
-                    <span>Play</span>
-                  </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {GOOGLE_FONTS.map((f) => {
+            const active = settings.selectedFont === f.name;
+            return (
+              <button
+                key={f.name}
+                type="button"
+                onClick={() => {
+                  onUpdateSettings({ selectedFont: f.name });
+                  setSavedSingleLinkBanner(true);
+                }}
+                className={`text-left rounded-lg p-3 border transition-all cursor-pointer ${
+                  active
+                    ? 'bg-[#53FC18]/12 border-[#53FC18] text-white'
+                    : 'bg-[#080B11] border-slate-800 hover:border-slate-700 text-slate-300'
+                }`}
+              >
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1">
+                  <span>{f.name}</span>
+                  <span>{f.styleTag}</span>
                 </div>
-              );
-            })}
-          </div>
-
-          <div className="pt-2">
-            <label
-              htmlFor="custom-sfx-url"
-              className="block text-xs font-medium text-slate-300 mb-1"
-            >
-              Optional Custom MP3/WAV Sound URL (Leave blank to use Polyphonic Synth)
-            </label>
-            <input
-              id="custom-sfx-url"
-              type="url"
-              value={settings.customSfxUrl}
-              onChange={(e) => onUpdateSettings({ customSfxUrl: e.target.value })}
-              placeholder="https://example.com/custom-alert-sound.mp3"
-              className="w-full rounded-lg bg-[#070A0F] border border-slate-800 px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-[#53FC18]"
-            />
-          </div>
-        </section>
-      </div>
+                <div
+                  className="text-sm font-bold whitespace-nowrap overflow-hidden text-ellipsis"
+                  style={{ fontFamily: `'${f.name}', sans-serif` }}
+                >
+                  <span className="text-[#53FC18]">{activeUserDisplay}</span>{' '}
+                  <span className="text-white">started following</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Multi-Accent Animated Text-to-Speech (TTS) Engine Customizer */}
       <section className="rounded-xl bg-[#0D131C] border border-slate-800 p-6 space-y-5">
@@ -1205,12 +1064,11 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
               </div>
               <p className="text-xs text-slate-300">
                 Bundles your selected <strong className="text-white">Template ({settings.activeAlertTemplate})</strong>,{' '}
-                <strong className="text-white">Music ({settings.sfxPreset})</strong>,{' '}
                 <strong className="text-white">Font ({settings.selectedFont})</strong>,{' '}
                 <strong className="text-white">Alert Duration ({settings.alertDuration}s)</strong>,{' '}
                 <strong className="text-white">TTS Speed ({settings.ttsSettings.rate.toFixed(1)}x)</strong>,{' '}
                 <strong className="text-white">TTS Volume ({Math.round(settings.ttsSettings.volume * 100)}%)</strong>, and{' '}
-                <strong className="text-white">Accent ({settings.ttsSettings.lang})</strong> into one single link below.
+                <strong className="text-white">Accent ({settings.ttsSettings.lang})</strong> — and syncs live to existing OBS links automatically.
               </p>
             </div>
 
@@ -1236,14 +1094,11 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
               <span className="text-xs font-mono font-bold text-[#53FC18] uppercase tracking-wider">
                 {savedSingleLinkBanner
                   ? '✓ Settings Saved! Your Single Unified OBS Browser Source Link:'
-                  : 'Generated Single OBS Link (Template + Music + Font + Duration + Speed + Volume + Accent):'}
+                  : 'Generated Single OBS Link (Template + Font + Duration + Speed + Volume + Accent):'}
               </span>
               <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
                 <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-200">
                   Template: <strong className="text-[#53FC18]">{settings.activeAlertTemplate}</strong>
-                </span>
-                <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-200">
-                  Music: <strong className="text-[#53FC18]">{settings.sfxPreset}</strong>
                 </span>
                 <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-200">
                   Font: <strong className="text-[#53FC18]">{settings.selectedFont}</strong>

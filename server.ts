@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   textAlertDuration: 6,
   textAlertSfxPreset: 'royal',
   alertDuration: 7,
-  sfxPreset: 'cyber',
+  sfxPreset: 'none',
   customSfxUrl: '',
   ttsSettings: {
     enabled: true,
@@ -731,7 +731,7 @@ async function startServer() {
         : 'all';
     const nextStyle: TextAlertStyle = style || appState.textAlertStyle || 'kinetic-neon';
     const nextFont = font || appState.textAlertFont || 'Bebas Neue';
-    const nextSfx = sfxPreset || appState.textAlertSfxPreset || appState.sfxPreset || 'royal';
+    const nextSfx = sfxPreset || appState.textAlertSfxPreset || 'royal';
     const nextDuration =
       typeof duration === 'number' && Number.isFinite(duration)
         ? Math.min(20, Math.max(2, Math.round(duration)))
@@ -1198,11 +1198,9 @@ async function startServer() {
       font:
         overrides?.font ||
         (isTextOnly ? appState.textAlertFont || 'Bebas Neue' : appState.selectedFont),
-      sfxPreset:
-        overrides?.sfxPreset ||
-        (isTextOnly
-          ? appState.textAlertSfxPreset || appState.sfxPreset || 'royal'
-          : appState.sfxPreset),
+      sfxPreset: isTextOnly
+        ? overrides?.sfxPreset || appState.textAlertSfxPreset || 'royal'
+        : 'none',
       duration:
         overrides?.duration ||
         (isTextOnly ? appState.textAlertDuration || 6 : appState.alertDuration),

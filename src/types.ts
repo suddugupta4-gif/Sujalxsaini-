@@ -14,7 +14,7 @@ export type FontFamilyName =
   | 'Syne'
   | 'JetBrains Mono';
 
-export type SfxPresetId = 'cyber' | 'royal' | 'valorant' | 'anime' | 'glass' | 'arcade';
+export type SfxPresetId = 'none' | 'cyber' | 'royal' | 'valorant' | 'anime' | 'glass' | 'arcade';
 
 export type TtsLangCode =
   | 'pro-hype-male'

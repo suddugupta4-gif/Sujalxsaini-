@@ -16,6 +16,7 @@ import {
   parseKickEventDetails,
   validatePin,
   parseObsQueryOverrides,
+  resolveLiveObsAlertConfig,
 } from './logic';
 
 test('extractFollowerUsername handles official Kick webhook payload shapes', () => {
@@ -142,6 +143,18 @@ test('buildObsAlertUrl, buildObsTextAlertUrl, and buildObsCounterUrl generate ro
     'https://sujalx-kick-studio.onrender.com/?obs=alerts&template=gold&font=Cinzel&tts=1&voice=en-IN&sfx=royal&duration=8&rate=1.2&volume=0.9'
   );
 
+  const followSilentUrl = buildObsAlertUrl('https://sujalx-kick-studio.onrender.com/', {
+    template: 'neon',
+    font: 'Rajdhani',
+    tts: true,
+    voice: 'pro-hype-male',
+    duration: 5,
+  });
+  assert.equal(
+    followSilentUrl,
+    'https://sujalx-kick-studio.onrender.com/?obs=alerts&template=neon&font=Rajdhani&tts=1&voice=pro-hype-male&duration=5'
+  );
+
   const textAlertUrl = buildObsTextAlertUrl('https://sujalx-kick-studio.onrender.com/', {
     style: 'gold-impact',
     font: 'Bebas Neue',
@@ -246,4 +259,87 @@ test('parseObsQueryOverrides extracts OBS routing, text-alerts style, and templa
   assert.equal(counterGoalIdParsed.obsMode, 'counter');
   assert.equal(counterGoalIdParsed.goalId, 'goal-abc123');
   assert.equal(counterGoalIdParsed.hasGoalParam, false);
+
+  const defaultFollowParsed = parseObsQueryOverrides('?obs=alerts');
+  assert.equal(defaultFollowParsed.sfx, 'none');
+  const defaultKicksParsed = parseObsQueryOverrides('?obs=text-alerts');
+  assert.equal(defaultKicksParsed.sfx, 'royal');
+});
+
+test('resolveLiveObsAlertConfig updates past OBS links live without regenerating URL and forces zero SFX on follow alerts', () => {
+  const yesterdayFollowUrlSearch =
+    '?obs=alerts&template=neon&font=Rajdhani&tts=1&voice=hi-IN&sfx=arcade&duration=4&rate=1.2&volume=1';
+
+  const liveSettings = {
+    channelName: 'sujalxsaini',
+    channelUrl: 'https://kick.com/sujalxsaini',
+    pin: '1234',
+    followerCount: 466,
+    followerGoal: 500,
+    goalTitle: 'ROAD TO 500 FOLLOWERS',
+    showGoalOnCounter: true,
+    alertsPaused: false,
+    alertsMuted: false,
+    activeAlertTemplate: 'gold',
+    activeCounterTemplate: 'neon',
+    selectedFont: 'Cinzel',
+    counterFont: 'Orbitron',
+    textAlertFont: 'Bebas Neue',
+    textAlertStyle: 'kinetic-neon',
+    textAlertDuration: 6,
+    textAlertSfxPreset: 'valorant',
+    alertDuration: 9,
+    sfxPreset: 'cyber',
+    customSfxUrl: '',
+    ttsSettings: {
+      enabled: false,
+      mode: 'stream',
+      lang: 'pro-caster-female',
+      messageTemplate: '{username} started following',
+      rate: 0.9,
+      pitch: 1.0,
+      volume: 0.75,
+    },
+    recentFollowers: [],
+    webhookLogs: [],
+    setupChecklist: {
+      obsStep1LinksCopied: true,
+      obsStep2SourceCreated: true,
+      obsStep3DimensionsSet: false,
+      obsStep4AudioControlEnabled: false,
+      obsStep5MonitorAndOutput: false,
+      obsStep6VerifiedLive: false,
+      webhookStep1UrlCopied: true,
+      webhookStep2AppCreated: false,
+      webhookStep3SubscribedFollowed: false,
+      webhookStep4SimulatedTest: false,
+      webhookStep5RenderDeployed: false,
+    },
+  } as const;
+
+  // Follow alert on yesterday's URL MUST obey live settings AND force sfxPreset='none' even though URL had sfx=arcade
+  const resolvedFollow = resolveLiveObsAlertConfig({
+    search: yesterdayFollowUrlSearch,
+    eventType: 'follow',
+    liveSettings: liveSettings as unknown as import('../types').AppSettings,
+  });
+  assert.equal(resolvedFollow.sfxPreset, 'none');
+  assert.equal(resolvedFollow.template, 'gold');
+  assert.equal(resolvedFollow.font, 'Cinzel');
+  assert.equal(resolvedFollow.duration, 9);
+  assert.equal(resolvedFollow.ttsEnabled, false);
+  assert.equal(resolvedFollow.ttsVoice, 'pro-caster-female');
+  assert.equal(resolvedFollow.ttsRate, 0.9);
+  assert.equal(resolvedFollow.ttsVolume, 0.75);
+
+  // Kicks alert STILL plays Kicks & Subs SFX (valorant)
+  const resolvedKicks = resolveLiveObsAlertConfig({
+    search: '?obs=text-alerts',
+    eventType: 'kicks',
+    liveSettings: liveSettings as unknown as import('../types').AppSettings,
+    textOnlyMode: true,
+  });
+  assert.equal(resolvedKicks.sfxPreset, 'valorant');
+  assert.equal(resolvedKicks.font, 'Bebas Neue');
+  assert.equal(resolvedKicks.duration, 6);
 });

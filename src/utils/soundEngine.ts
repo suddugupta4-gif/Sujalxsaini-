@@ -8,6 +8,12 @@ export const SFX_PRESET_INFO: {
   description: string;
 }[] = [
   {
+    id: 'none',
+    name: 'Off (No Alert Sound)',
+    tag: 'Silent SFX',
+    description: 'Alert chime disabled — visual alert + TTS voice plays directly',
+  },
+  {
     id: 'cyber',
     name: 'Kick Cyber Chime',
     tag: 'Default Neon',
@@ -88,6 +94,7 @@ function playNote(
 }
 
 const PRESET_HANDOVER_MS: Record<SfxPresetId, number> = {
+  none: 0,
   cyber: 620,
   royal: 660,
   valorant: 560,
@@ -101,7 +108,7 @@ export async function playSynthesizedSfx(
   customSfxUrl?: string,
   muted = false
 ): Promise<void> {
-  if (muted) return;
+  if (muted || preset === 'none') return;
 
   if (customSfxUrl && customSfxUrl.trim().length > 0) {
     try {

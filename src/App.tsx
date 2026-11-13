@@ -73,7 +73,7 @@ const FALLBACK_SETTINGS: AppSettings = {
   textAlertDuration: 6,
   textAlertSfxPreset: 'royal',
   alertDuration: 7,
-  sfxPreset: 'cyber',
+  sfxPreset: 'none',
   customSfxUrl: '',
   ttsSettings: {
     enabled: true,
@@ -351,15 +351,13 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
       }
 
       if (!settings.alertsMuted) {
-        const sfxToUse =
-          eventType === 'follow'
-            ? settings.sfxPreset
-            : settings.textAlertSfxPreset || settings.sfxPreset || 'royal';
-        await playSynthesizedSfx(
-          sfxToUse,
-          settings.customSfxUrl,
-          settings.alertsMuted
-        ).catch(() => {});
+        if (eventType !== 'follow') {
+          await playSynthesizedSfx(
+            settings.textAlertSfxPreset || 'royal',
+            settings.customSfxUrl,
+            settings.alertsMuted
+          ).catch(() => {});
+        }
         const prepared = await ttsPreparePromise;
         prepared?.playNow();
       }

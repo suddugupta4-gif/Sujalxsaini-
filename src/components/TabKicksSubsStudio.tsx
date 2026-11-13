@@ -732,6 +732,24 @@ export const TabKicksSubsStudio: React.FC<TabKicksSubsStudioProps> = ({
           </div>
         </div>
 
+        {/* Optional Custom SFX MP3/WAV URL for Kicks & Subs */}
+        <div className="rounded-lg bg-[#05080D] border border-slate-800 p-3 flex flex-col sm:flex-row sm:items-center gap-2.5">
+          <label
+            htmlFor="kicks-custom-sfx-url"
+            className="text-[11px] font-mono uppercase text-amber-300 font-bold whitespace-nowrap"
+          >
+            Optional Custom Kicks/Subs SFX URL:
+          </label>
+          <input
+            id="kicks-custom-sfx-url"
+            type="url"
+            value={settings.customSfxUrl}
+            onChange={(e) => onUpdateSettings({ customSfxUrl: e.target.value })}
+            placeholder="https://example.com/kicks-alert-sound.mp3 (Leave blank for built-in synth SFX)"
+            className="flex-1 rounded bg-[#0B1018] border border-slate-700 px-3 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-400"
+          />
+        </div>
+
         {/* Active Generated Link Display */}
         <div className="rounded-lg bg-[#05070B] border border-amber-400/40 p-4 space-y-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">

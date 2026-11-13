@@ -10,6 +10,7 @@ import type {
 import {
   formatEventTtsText,
   parseObsQueryOverrides,
+  resolveLiveObsAlertConfig,
 } from '../utils/logic';
 import {
   playSynthesizedSfx,
@@ -106,41 +107,20 @@ export const ObsAlertsOverlay: React.FC<ObsAlertsOverlayProps> = ({
     const isTextAlert = eventType !== 'follow';
 
     const currentSettings = settingsRef.current;
-    const overrides = parseObsQueryOverrides(window.location.search, currentSettings || undefined);
-    const matchedTextLink =
-      isTextOnlyChannel && overrides.alertId
-        ? (currentSettings?.textAlertLinkHistory || []).find(
-            (item) => item.id === overrides.alertId
-          )
-        : undefined;
+    const resolvedConfig = resolveLiveObsAlertConfig({
+      search: window.location.search,
+      eventType,
+      liveSettings: currentSettings,
+      alertPayload: nextAlert,
+      textOnlyMode,
+    });
 
-    const sfxToPlay = matchedTextLink?.sfxPreset
-      ? matchedTextLink.sfxPreset
-      : isTextAlert
-        ? overrides.hasSfxParam
-          ? overrides.sfx
-          : currentSettings?.textAlertSfxPreset || nextAlert.sfxPreset || overrides.sfx
-        : nextAlert.sfxPreset || overrides.sfx;
-    const durationSec = matchedTextLink
-      ? matchedTextLink.duration
-      : nextAlert.duration ||
-        (isTextAlert
-          ? currentSettings?.textAlertDuration || overrides.duration || 6
-          : overrides.duration || 7);
-    const ttsAllowed = matchedTextLink
-      ? matchedTextLink.ttsEnabled
-      : overrides.hasTtsParam
-        ? overrides.ttsEnabled
-        : (nextAlert.ttsEnabled ?? overrides.ttsEnabled);
-    const ttsVoice = matchedTextLink
-      ? matchedTextLink.voice
-      : nextAlert.ttsLang || overrides.voice;
-    const ttsRate = matchedTextLink
-      ? matchedTextLink.rate
-      : overrides.rate || currentSettings?.ttsSettings.rate || 1.0;
-    const ttsVolume = matchedTextLink
-      ? matchedTextLink.volume
-      : (overrides.volume ?? currentSettings?.ttsSettings.volume ?? 1.0);
+    const sfxToPlay = isTextAlert ? resolvedConfig.sfxPreset : 'none';
+    const durationSec = resolvedConfig.duration;
+    const ttsAllowed = resolvedConfig.ttsEnabled;
+    const ttsVoice = resolvedConfig.ttsVoice;
+    const ttsRate = resolvedConfig.ttsRate;
+    const ttsVolume = resolvedConfig.ttsVolume;
     const isMuted = mutedRef.current || Boolean(currentSettings?.alertsMuted);
 
     const ttsMsg =
@@ -171,12 +151,15 @@ export const ObsAlertsOverlay: React.FC<ObsAlertsOverlayProps> = ({
     setActiveAlert(nextAlert);
     triggerConfettiBurst(false);
 
-    // 2. Play Alert Sound FIRST while pre-buffering TTS in parallel -> THEN speak TTS immediately after chime
-    const sfxPromise = playSynthesizedSfx(
-      sfxToPlay,
-      currentSettings?.customSfxUrl,
-      isMuted
-    ).catch(() => {});
+    // 2. Play Alert Sound FIRST (Kicks & Subs only — Follow alerts are silent SFX) while pre-buffering TTS in parallel
+    const sfxPromise =
+      isTextAlert && sfxToPlay !== 'none'
+        ? playSynthesizedSfx(
+            sfxToPlay,
+            currentSettings?.customSfxUrl,
+            isMuted
+          ).catch(() => {})
+        : Promise.resolve();
 
     const ttsPromise: Promise<PreparedTtsHandle | null> =
       ttsAllowed && !isMuted
@@ -267,7 +250,7 @@ export const ObsAlertsOverlay: React.FC<ObsAlertsOverlayProps> = ({
             followerCount: 463,
             template: queryOverrides.alertTemplate,
             font: queryOverrides.font,
-            sfxPreset: queryOverrides.sfx,
+            sfxPreset: 'none',
             duration: queryOverrides.duration,
             ttsEnabled: queryOverrides.ttsEnabled,
             ttsLang: queryOverrides.voice,
@@ -324,12 +307,12 @@ export const ObsAlertsOverlay: React.FC<ObsAlertsOverlayProps> = ({
               timestamp: new Date().toISOString(),
               source: 'test',
               followerCount: data.settings?.followerCount || 463,
-              template: overrides.alertTemplate,
-              font: overrides.font,
-              sfxPreset: overrides.sfx,
-              duration: overrides.duration || 7,
+              template: data.settings?.activeAlertTemplate || overrides.alertTemplate,
+              font: data.settings?.selectedFont || overrides.font,
+              sfxPreset: 'none',
+              duration: data.settings?.alertDuration || overrides.duration || 7,
               ttsEnabled: false,
-              ttsLang: overrides.voice,
+              ttsLang: data.settings?.ttsSettings?.lang || overrides.voice,
               ttsMessage: `${latestUser} started following`,
             };
             queueRef.current.push(initAlert);
@@ -428,18 +411,21 @@ export const ObsAlertsOverlay: React.FC<ObsAlertsOverlayProps> = ({
             timestamp: latestEvent.timestamp,
             source: latestEvent.source,
             followerCount: latestSettings.followerCount,
-            template: overrides.alertTemplate,
+            template: latestSettings.activeAlertTemplate || overrides.alertTemplate,
             font:
               eventType !== 'follow'
                 ? latestSettings.textAlertFont || overrides.font
-                : overrides.font,
-            sfxPreset: overrides.sfx,
+                : latestSettings.selectedFont || overrides.font,
+            sfxPreset:
+              eventType !== 'follow'
+                ? latestSettings.textAlertSfxPreset || 'royal'
+                : 'none',
             duration:
               eventType !== 'follow'
                 ? latestSettings.textAlertDuration || overrides.duration
-                : overrides.duration,
-            ttsEnabled: overrides.ttsEnabled,
-            ttsLang: overrides.voice,
+                : latestSettings.alertDuration || overrides.duration,
+            ttsEnabled: latestSettings.ttsSettings?.enabled ?? overrides.ttsEnabled,
+            ttsLang: latestSettings.ttsSettings?.lang || overrides.voice,
             ttsMessage: formatEventTtsText(
               eventType,
               latestEvent.username,
@@ -461,29 +447,17 @@ export const ObsAlertsOverlay: React.FC<ObsAlertsOverlayProps> = ({
     };
   }, [isTextOnlyChannel]);
 
-  const matchedTextLink =
-    isTextOnlyChannel && queryOverrides.alertId
-      ? (settings?.textAlertLinkHistory || []).find(
-          (item) => item.id === queryOverrides.alertId
-        )
-      : undefined;
+  const liveVisualConfig = resolveLiveObsAlertConfig({
+    search: window.location.search,
+    eventType: activeAlert?.eventType || (isTextOnlyChannel ? 'kicks' : 'follow'),
+    liveSettings: settings,
+    alertPayload: activeAlert,
+    textOnlyMode,
+  });
 
-  const resolvedTemplate = queryOverrides.hasTemplateParam
-    ? queryOverrides.alertTemplate
-    : activeAlert?.template || queryOverrides.alertTemplate;
-  const resolvedFont = matchedTextLink
-    ? matchedTextLink.font
-    : queryOverrides.hasFontParam
-      ? queryOverrides.font
-      : activeAlert?.font ||
-        (activeAlert?.eventType && activeAlert.eventType !== 'follow'
-          ? settings?.textAlertFont || queryOverrides.font
-          : queryOverrides.font);
-  const resolvedTextStyle = matchedTextLink
-    ? matchedTextLink.style
-    : queryOverrides.hasStyleParam
-      ? queryOverrides.textAlertStyle
-      : activeAlert?.textStyle || settings?.textAlertStyle || queryOverrides.textAlertStyle;
+  const resolvedTemplate = liveVisualConfig.template;
+  const resolvedFont = liveVisualConfig.font;
+  const resolvedTextStyle = liveVisualConfig.textStyle;
   const resolvedMessage =
     activeAlert?.ttsMessage ||
     formatEventTtsText(

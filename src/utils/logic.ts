@@ -448,7 +448,7 @@ export function buildObsAlertUrl(
     font: FontFamilyName;
     tts: boolean;
     voice: TtsLangCode;
-    sfx: SfxPresetId;
+    sfx?: SfxPresetId;
     duration: number;
     rate?: number;
     volume?: number;
@@ -461,7 +461,9 @@ export function buildObsAlertUrl(
   searchParams.set('font', params.font);
   searchParams.set('tts', params.tts ? '1' : '0');
   searchParams.set('voice', params.voice);
-  searchParams.set('sfx', params.sfx);
+  if (params.sfx && params.sfx !== 'none') {
+    searchParams.set('sfx', params.sfx);
+  }
   searchParams.set('duration', String(params.duration));
   if (typeof params.rate === 'number' && Number.isFinite(params.rate)) {
     searchParams.set('rate', String(Number(params.rate.toFixed(2))));
@@ -854,7 +856,7 @@ export function parseObsQueryOverrides(search: string, defaults?: Partial<AppSet
     'Syne',
     'JetBrains Mono',
   ];
-  const validSfx: SfxPresetId[] = ['cyber', 'royal', 'valorant', 'anime', 'glass', 'arcade'];
+  const validSfx: SfxPresetId[] = ['none', 'cyber', 'royal', 'valorant', 'anime', 'glass', 'arcade'];
   const validVoices: TtsLangCode[] = [
     'pro-hype-male',
     'pro-caster-female',
@@ -919,8 +921,8 @@ export function parseObsQueryOverrides(search: string, defaults?: Partial<AppSet
     rawSfx && validSfx.includes(rawSfx as SfxPresetId)
       ? (rawSfx as SfxPresetId)
       : obsMode === 'text-alerts'
-        ? defaults?.textAlertSfxPreset || defaults?.sfxPreset || 'royal'
-        : defaults?.sfxPreset || 'cyber';
+        ? defaults?.textAlertSfxPreset || 'royal'
+        : defaults?.sfxPreset || 'none';
 
   const voice: TtsLangCode =
     rawVoice && validVoices.includes(rawVoice as TtsLangCode)
@@ -985,5 +987,114 @@ export function parseObsQueryOverrides(search: string, defaults?: Partial<AppSet
     hasTemplateParam: Boolean(rawTemplate),
     previewMode: params.get('preview') === '1',
     autostart: params.get('autostart') === '1',
+  };
+}
+
+export interface LiveResolvedObsAlertConfig {
+  sfxPreset: SfxPresetId;
+  template: AlertTemplateId;
+  font: FontFamilyName;
+  textStyle: TextAlertStyle;
+  duration: number;
+  ttsEnabled: boolean;
+  ttsVoice: TtsLangCode;
+  ttsRate: number;
+  ttsVolume: number;
+}
+
+/**
+ * Resolves live OBS overlay config so any OBS link generated previously
+ * automatically obeys live dashboard/server settings without needing a new URL,
+ * and ensures follow alerts never play alert sound effects.
+ */
+export function resolveLiveObsAlertConfig(options: {
+  search: string;
+  eventType: AlertEventType;
+  liveSettings?: AppSettings | null;
+  alertPayload?: {
+    template?: AlertTemplateId;
+    font?: FontFamilyName;
+    textStyle?: TextAlertStyle;
+    sfxPreset?: SfxPresetId;
+    duration?: number;
+    ttsEnabled?: boolean;
+    ttsLang?: TtsLangCode;
+  } | null;
+  textOnlyMode?: boolean;
+}): LiveResolvedObsAlertConfig {
+  const { search, eventType, liveSettings, alertPayload, textOnlyMode = false } = options;
+  const overrides = parseObsQueryOverrides(search, liveSettings || undefined);
+  const isTextAlert = eventType !== 'follow';
+  const isTextOnlyChannel = textOnlyMode || overrides.obsMode === 'text-alerts';
+
+  const matchedTextLink =
+    isTextOnlyChannel && overrides.alertId
+      ? (liveSettings?.textAlertLinkHistory || []).find(
+          (item) => item.id === overrides.alertId
+        )
+      : undefined;
+
+  if (overrides.previewMode) {
+    return {
+      sfxPreset: isTextAlert ? overrides.sfx : 'none',
+      template: overrides.alertTemplate,
+      font: overrides.font,
+      textStyle: overrides.textAlertStyle,
+      duration: overrides.duration,
+      ttsEnabled: overrides.ttsEnabled,
+      ttsVoice: overrides.voice,
+      ttsRate: overrides.rate,
+      ttsVolume: overrides.volume,
+    };
+  }
+
+  if (matchedTextLink) {
+    return {
+      sfxPreset: matchedTextLink.sfxPreset || liveSettings?.textAlertSfxPreset || 'royal',
+      template: liveSettings?.activeAlertTemplate || overrides.alertTemplate,
+      font: matchedTextLink.font,
+      textStyle: matchedTextLink.style,
+      duration: matchedTextLink.duration,
+      ttsEnabled: matchedTextLink.ttsEnabled,
+      ttsVoice: matchedTextLink.voice,
+      ttsRate: matchedTextLink.rate,
+      ttsVolume: matchedTextLink.volume,
+    };
+  }
+
+  if (liveSettings) {
+    return {
+      sfxPreset: isTextAlert
+        ? liveSettings.textAlertSfxPreset || alertPayload?.sfxPreset || overrides.sfx || 'royal'
+        : 'none',
+      template:
+        liveSettings.activeAlertTemplate || alertPayload?.template || overrides.alertTemplate,
+      font: isTextAlert
+        ? liveSettings.textAlertFont || alertPayload?.font || overrides.font
+        : liveSettings.selectedFont || alertPayload?.font || overrides.font,
+      textStyle:
+        liveSettings.textAlertStyle || alertPayload?.textStyle || overrides.textAlertStyle,
+      duration: isTextAlert
+        ? liveSettings.textAlertDuration || alertPayload?.duration || overrides.duration || 6
+        : liveSettings.alertDuration || alertPayload?.duration || overrides.duration || 7,
+      ttsEnabled:
+        liveSettings.ttsSettings?.enabled ?? alertPayload?.ttsEnabled ?? overrides.ttsEnabled,
+      ttsVoice:
+        liveSettings.ttsSettings?.lang || alertPayload?.ttsLang || overrides.voice,
+      ttsRate: liveSettings.ttsSettings?.rate ?? overrides.rate ?? 1.0,
+      ttsVolume: liveSettings.ttsSettings?.volume ?? overrides.volume ?? 1.0,
+    };
+  }
+
+  return {
+    sfxPreset: isTextAlert ? alertPayload?.sfxPreset || overrides.sfx : 'none',
+    template: alertPayload?.template || overrides.alertTemplate,
+    font: alertPayload?.font || overrides.font,
+    textStyle: alertPayload?.textStyle || overrides.textAlertStyle,
+    duration: alertPayload?.duration || overrides.duration,
+    ttsEnabled: alertPayload?.ttsEnabled ?? overrides.ttsEnabled,
+    ttsVoice: alertPayload?.ttsLang || overrides.voice,
+    ttsRate: overrides.rate ?? 1.0,
+    ttsVolume: overrides.volume ?? 1.0,
   };
 }

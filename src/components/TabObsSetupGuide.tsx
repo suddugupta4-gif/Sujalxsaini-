@@ -43,7 +43,6 @@ export const TabObsSetupGuide: React.FC<TabObsSetupGuideProps> = ({
     font: settings.selectedFont,
     tts: settings.ttsSettings.enabled,
     voice: settings.ttsSettings.lang,
-    sfx: settings.sfxPreset,
     duration: settings.alertDuration,
     rate: settings.ttsSettings.rate,
     volume: settings.ttsSettings.volume,

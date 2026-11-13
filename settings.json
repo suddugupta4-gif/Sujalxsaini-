@@ -2,7 +2,7 @@
   "channelName": "sujalxsaini",
   "channelUrl": "https://kick.com/sujalxsaini",
   "pin": "1234",
-  "followerCount": 465,
+  "followerCount": 466,
   "followerGoal": 500,
   "goalTitle": "ROAD TO 500 FOLLOWERS",
   "showGoalOnCounter": true,
@@ -17,18 +17,25 @@
   "textAlertDuration": 6,
   "textAlertSfxPreset": "valorant",
   "alertDuration": 5,
-  "sfxPreset": "cyber",
+  "sfxPreset": "none",
   "customSfxUrl": "",
   "ttsSettings": {
     "enabled": true,
     "mode": "stream",
     "lang": "pro-caster-female",
     "messageTemplate": "{username} started following",
-    "rate": 1,
+    "rate": 1.1,
     "pitch": 1,
     "volume": 1
   },
   "recentFollowers": [
+    {
+      "id": "fol-1794566283178-30gd",
+      "username": "LiveSyncFriend",
+      "timestamp": "2026-11-13T10:38:03.178Z",
+      "source": "test",
+      "eventType": "follow"
+    },
     {
       "id": "fol-1794560636203-gs6p",
       "username": "KaranClutchX",

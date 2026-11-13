@@ -69,25 +69,27 @@ export const ObsCounterOverlay: React.FC = () => {
   const count = settings?.followerCount ?? 463;
   const goal = matchedGoalItem
     ? matchedGoalItem.goal
-    : overrides.hasGoalParam
-      ? overrides.goal
-      : settings?.followerGoal || 500;
+    : settings
+      ? settings.followerGoal
+      : overrides.goal;
   const goalTitle = matchedGoalItem
     ? matchedGoalItem.goalTitle
-    : !overrides.hasGoalParam && settings?.goalTitle
-      ? settings.goalTitle
-      : `ROAD TO ${goal.toLocaleString()} FOLLOWERS`;
+    : settings?.goalTitle || `ROAD TO ${goal.toLocaleString()} FOLLOWERS`;
   const template = matchedGoalItem
     ? matchedGoalItem.template
-    : overrides.hasTemplateParam
-      ? overrides.counterTemplate
-      : settings?.activeCounterTemplate || overrides.counterTemplate;
+    : settings
+      ? settings.activeCounterTemplate
+      : overrides.counterTemplate;
   const font = matchedGoalItem
     ? matchedGoalItem.font
-    : overrides.hasFontParam
-      ? overrides.font
-      : settings?.counterFont || overrides.font;
-  const showGoal = matchedGoalItem ? matchedGoalItem.showGoal : overrides.showGoal;
+    : settings
+      ? settings.counterFont || settings.selectedFont
+      : overrides.font;
+  const showGoal = matchedGoalItem
+    ? matchedGoalItem.showGoal
+    : settings
+      ? (settings.showGoalOnCounter ?? true)
+      : overrides.showGoal;
   const recentFollowers = settings?.recentFollowers ?? [];
 
   return (
