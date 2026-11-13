@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Crown, Heart, Terminal, Radio, Sparkles, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import type { CounterTemplateId, FontFamilyName, RecentFollower } from '../types';
 import {
   calculateGoalPercentage,
@@ -154,8 +154,8 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
 
   const fontStyle = { fontFamily: `'${font}', sans-serif` };
 
-  // Full-visibility Goal Progress Bar:
-  // Row 1: Full Goal Title (never crushed to "RO...") + Percentage pill
+  // Clean Goal Progress Bar (sits cleanly at the top of the widget):
+  // Row 1: Full Goal Title + Percentage pill
   // Row 2: Glowing animated plasma progress bar
   // Row 3: Real Count / Goal on left + Remaining TO GO on right
   const renderAnimatedGoalProgressBar = (
@@ -163,11 +163,14 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
     accentHex: string,
     trackBorderClass: string
   ) => (
-    <div className="mt-3 pt-2.5 border-t border-white/15">
+    <div>
       {/* Row 1: Full Goal Title + Percentage */}
       <div className="flex items-center justify-between gap-2 mb-1.5">
-        <span className="text-[11px] sm:text-xs font-extrabold tracking-wider text-white uppercase whitespace-nowrap truncate">
-          {goalTitle || 'ROAD TO 1.5K FOLLOWERS'}
+        <span
+          style={fontStyle}
+          className="text-xs sm:text-sm font-extrabold tracking-wider text-white uppercase whitespace-nowrap truncate"
+        >
+          {goalTitle || `ROAD TO ${goal.toLocaleString()} FOLLOWERS`}
         </span>
         <span
           style={{
@@ -222,7 +225,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
   );
 
   // Recent Follow Box with Follower PFP + Top Username + Bottom "started following"
-  const renderAnimatedRecentFollowsRow = (accentHex: string) => {
+  const renderAnimatedRecentFollowsRow = (accentHex: string, hasTopDivider = true) => {
     const pfpSrc = getFollowerAvatarUrl(
       currentRecent.username,
       currentRecent.avatarUrl,
@@ -234,7 +237,11 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
     );
 
     return (
-      <div className="mt-3 pt-2.5 border-t border-white/15 flex items-center justify-between gap-2.5">
+      <div
+        className={`${
+          hasTopDivider ? 'mt-3 pt-2.5 border-t border-white/15' : ''
+        } flex items-center justify-between gap-2.5`}
+      >
         {/* Left: Follower PFP + Top Username + Bottom "started following" */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <div
@@ -307,39 +314,6 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
             className="pointer-events-none absolute top-0 left-0 w-1/2 h-[2px] bg-gradient-to-r from-transparent via-[#53FC18] to-transparent animate-laser-scan"
           />
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#53FC18]/20 border border-[#53FC18] flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(83,252,24,0.45)]">
-                <span
-                  className="text-xl sm:text-2xl font-black text-[#53FC18]"
-                  style={{ fontFamily: "'Orbitron', sans-serif" }}
-                >
-                  K
-                </span>
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] sm:text-[11px] font-bold tracking-wider text-[#53FC18] uppercase whitespace-nowrap truncate">
-                  SUJALXSAINI · FOLLOWERS
-                </div>
-                <div
-                  style={fontStyle}
-                  className="text-2xl sm:text-3xl font-black tracking-tight tabular-nums text-white whitespace-nowrap leading-tight"
-                >
-                  {count.toLocaleString()}
-                </div>
-              </div>
-            </div>
-
-            <div className="text-right font-mono tabular-nums shrink-0">
-              <div className="text-[10px] text-slate-400 uppercase whitespace-nowrap">
-                FOLLOW GOAL
-              </div>
-              <div className="text-xs sm:text-sm font-bold text-[#53FC18] whitespace-nowrap">
-                {goal.toLocaleString()} GOAL
-              </div>
-            </div>
-          </div>
-
           {showGoal &&
             renderAnimatedGoalProgressBar(
               'bg-gradient-to-r from-[#16A34A] via-[#22C55E] to-[#53FC18]',
@@ -347,7 +321,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
               'border-[#53FC18]/45'
             )}
 
-          {renderAnimatedRecentFollowsRow('#53FC18')}
+          {renderAnimatedRecentFollowsRow('#53FC18', showGoal)}
         </div>
       </div>
     );
@@ -362,46 +336,16 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
             className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-[#FFD700]/12 to-transparent animate-shimmer"
           />
 
-          <div className="relative z-10 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#FFD700]/20 border border-[#FFD700] flex items-center justify-center shrink-0">
-                <Crown className="w-5 h-5 text-[#FFD700]" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-[#FFD700] uppercase whitespace-nowrap truncate">
-                  SUJALXSAINI · FOLLOWERS
-                </div>
-                <div
-                  style={{
-                    ...fontStyle,
-                    color: '#FFD700',
-                    textShadow: '0 0 14px rgba(255, 215, 0, 0.55)',
-                  }}
-                  className="text-2xl sm:text-3xl font-bold tabular-nums whitespace-nowrap leading-tight"
-                >
-                  {count.toLocaleString()}
-                </div>
-              </div>
-            </div>
+          <div className="relative z-10">
+            {showGoal &&
+              renderAnimatedGoalProgressBar(
+                'bg-gradient-to-r from-[#B8860B] via-[#FFD700] to-[#FFF3B0]',
+                '#FFD700',
+                'border-[#FFD700]/45'
+              )}
 
-            <div className="text-right font-mono tabular-nums shrink-0">
-              <div className="text-[10px] text-amber-200/70 uppercase whitespace-nowrap">
-                FOLLOW GOAL
-              </div>
-              <div className="text-xs sm:text-sm font-bold text-[#FFD700] whitespace-nowrap">
-                {goal.toLocaleString()} GOAL
-              </div>
-            </div>
+            {renderAnimatedRecentFollowsRow('#FFD700', showGoal)}
           </div>
-
-          {showGoal &&
-            renderAnimatedGoalProgressBar(
-              'bg-gradient-to-r from-[#B8860B] via-[#FFD700] to-[#FFF3B0]',
-              '#FFD700',
-              'border-[#FFD700]/45'
-            )}
-
-          {renderAnimatedRecentFollowsRow('#FFD700')}
         </div>
       </div>
     );
@@ -419,35 +363,14 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
             className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-[#53FC18]"
           />
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-[#FF0055] whitespace-nowrap">
-                <Radio className="w-3.5 h-3.5 text-[#FF0055] shrink-0" />
-                <span>LIVE · SUJALXSAINI FOLLOWERS</span>
-              </div>
-              <div
-                style={fontStyle}
-                className="text-2xl sm:text-3xl font-bold tabular-nums tracking-wider text-white whitespace-nowrap leading-tight mt-0.5"
-              >
-                {count.toLocaleString()}
-              </div>
-            </div>
-
-            <div className="text-right font-mono tabular-nums shrink-0">
-              <div className="text-[10px] text-slate-400 uppercase whitespace-nowrap">
-                FOLLOW GOAL
-              </div>
-              <div className="text-xs sm:text-sm font-bold text-[#53FC18] whitespace-nowrap">
-                {goal.toLocaleString()} GOAL
-              </div>
-            </div>
-          </div>
-
           {showGoal && (
-            <div className="mt-3 pt-2.5 border-t border-[#FF0055]/30">
-              <div className="flex items-center justify-between gap-2 text-[11px] font-mono mb-1.5">
-                <span className="text-white uppercase font-bold whitespace-nowrap truncate">
-                  {goalTitle || 'ROAD TO 1.5K FOLLOWERS'}
+            <div>
+              <div className="flex items-center justify-between gap-2 text-xs font-mono mb-1.5">
+                <span
+                  style={fontStyle}
+                  className="text-white uppercase font-bold whitespace-nowrap truncate"
+                >
+                  {goalTitle || `ROAD TO ${goal.toLocaleString()} FOLLOWERS`}
                 </span>
                 <span className="text-[#53FC18] tabular-nums font-bold whitespace-nowrap shrink-0">
                   {pct}%
@@ -476,7 +399,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
             </div>
           )}
 
-          {renderAnimatedRecentFollowsRow('#53FC18')}
+          {renderAnimatedRecentFollowsRow('#53FC18', showGoal)}
         </div>
       </div>
     );
@@ -486,34 +409,6 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
     return (
       <div className="p-2 w-full">
         <div className="relative overflow-hidden rounded-2xl backdrop-blur-2xl bg-slate-900/90 border-2 border-sky-400/60 shadow-[0_0_28px_rgba(56,189,248,0.35)] p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-sky-400/20 border border-sky-300/40 flex items-center justify-center shrink-0">
-                <Heart className="w-5 h-5 text-rose-400 fill-rose-400 animate-pulse" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold text-sky-300 whitespace-nowrap truncate">
-                  sujalxsaini · Followers
-                </div>
-                <div
-                  style={fontStyle}
-                  className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight text-white whitespace-nowrap leading-tight"
-                >
-                  {count.toLocaleString()}
-                </div>
-              </div>
-            </div>
-
-            <div className="text-right font-mono tabular-nums shrink-0">
-              <div className="text-[10px] text-slate-300 uppercase whitespace-nowrap">
-                FOLLOW GOAL
-              </div>
-              <div className="text-xs sm:text-sm font-bold text-sky-300 whitespace-nowrap">
-                {goal.toLocaleString()} GOAL
-              </div>
-            </div>
-          </div>
-
           {showGoal &&
             renderAnimatedGoalProgressBar(
               'bg-gradient-to-r from-sky-400 via-emerald-300 to-fuchsia-400',
@@ -521,7 +416,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
               'border-sky-400/40'
             )}
 
-          {renderAnimatedRecentFollowsRow('#38BDF8')}
+          {renderAnimatedRecentFollowsRow('#38BDF8', showGoal)}
         </div>
       </div>
     );
@@ -531,26 +426,6 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
     return (
       <div className="p-2 w-full">
         <div className="relative overflow-hidden rounded-xl bg-[#040D08]/95 border-2 border-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.35)] p-4 sm:p-5 text-emerald-300 font-mono w-full max-w-lg mx-auto">
-          <div className="flex items-center justify-between text-[11px] text-emerald-400 border-b border-emerald-500/30 pb-2 mb-2.5">
-            <div className="flex items-center gap-1.5 whitespace-nowrap truncate">
-              <Terminal className="w-3.5 h-3.5 shrink-0" />
-              <span>root@sujalxsaini:~# followers</span>
-            </div>
-            <span className="text-[#53FC18] font-bold shrink-0">[LIVE]</span>
-          </div>
-
-          <div className="flex items-baseline justify-between gap-3">
-            <div
-              style={fontStyle}
-              className="text-2xl sm:text-3xl font-extrabold tabular-nums text-[#53FC18] tracking-wider whitespace-nowrap"
-            >
-              {count.toLocaleString()}
-            </div>
-            <div className="text-xs text-emerald-400 tabular-nums whitespace-nowrap">
-              FOLLOW GOAL: <span className="text-white font-bold">{goal.toLocaleString()}</span>
-            </div>
-          </div>
-
           {showGoal &&
             renderAnimatedGoalProgressBar(
               'bg-gradient-to-r from-emerald-500 to-[#53FC18]',
@@ -558,7 +433,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
               'border-emerald-500/45'
             )}
 
-          {renderAnimatedRecentFollowsRow('#53FC18')}
+          {renderAnimatedRecentFollowsRow('#53FC18', showGoal)}
         </div>
       </div>
     );
@@ -568,38 +443,6 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
   return (
     <div className="p-2 w-full">
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#170B2A]/95 via-[#0B1228]/95 to-[#1F0B24]/95 border-2 border-fuchsia-400 shadow-[0_0_24px_rgba(232,121,249,0.45)] p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-fuchsia-500/25 border border-fuchsia-300 flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5 text-amber-300" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-bold tracking-wider uppercase text-fuchsia-300 whitespace-nowrap truncate">
-                SUJALXSAINI · FOLLOWERS
-              </div>
-              <div
-                style={{
-                  ...fontStyle,
-                  color: '#F0ABFC',
-                  textShadow: '0 0 12px rgba(232, 121, 249, 0.65)',
-                }}
-                className="text-2xl sm:text-3xl font-extrabold tabular-nums whitespace-nowrap leading-tight"
-              >
-                {count.toLocaleString()}
-              </div>
-            </div>
-          </div>
-
-          <div className="text-right font-mono tabular-nums shrink-0">
-            <div className="text-[10px] text-cyan-200 uppercase whitespace-nowrap">
-              FOLLOW GOAL
-            </div>
-            <div className="text-xs sm:text-sm font-bold text-amber-300 whitespace-nowrap">
-              {goal.toLocaleString()} GOAL
-            </div>
-          </div>
-        </div>
-
         {showGoal &&
           renderAnimatedGoalProgressBar(
             'bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-300',
@@ -607,7 +450,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
             'border-fuchsia-400/45'
           )}
 
-        {renderAnimatedRecentFollowsRow('#F0ABFC')}
+        {renderAnimatedRecentFollowsRow('#F0ABFC', showGoal)}
       </div>
     </div>
   );

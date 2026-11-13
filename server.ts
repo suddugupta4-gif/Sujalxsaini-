@@ -5,18 +5,28 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import type {
+  AlertEventType,
   AppSettings,
   CustomTtsPayload,
   FollowAlertPayload,
+  GoalLinkHistoryItem,
   ObsClientCounts,
   RecentFollower,
+  TextAlertEventFilter,
+  TextAlertLinkHistoryItem,
+  TextAlertStyle,
   WebhookLogEntry,
 } from './src/types.ts';
 import {
+  PUBLIC_RENDER_ORIGIN,
+  buildObsCounterUrl,
+  buildObsTextAlertUrl,
+  convertEmojisToSpokenText,
   extractFollowerAvatar,
   extractFollowerUsername,
-  formatTtsMessage,
+  formatEventTtsText,
   isMilestoneReached,
+  parseKickEventDetails,
 } from './src/utils/logic.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -37,13 +47,17 @@ const DEFAULT_SETTINGS: AppSettings = {
   activeCounterTemplate: 'neon',
   selectedFont: 'Orbitron',
   counterFont: 'Orbitron',
+  textAlertFont: 'Bebas Neue',
+  textAlertStyle: 'kinetic-neon',
+  textAlertDuration: 6,
+  textAlertSfxPreset: 'royal',
   alertDuration: 7,
   sfxPreset: 'cyber',
   customSfxUrl: '',
   ttsSettings: {
     enabled: true,
     mode: 'stream',
-    lang: 'en-US',
+    lang: 'pro-hype-male',
     messageTemplate: '{username} started following',
     rate: 1.0,
     pitch: 1.0,
@@ -113,6 +127,8 @@ const DEFAULT_SETTINGS: AppSettings = {
       },
     },
   ],
+  goalLinkHistory: [],
+  textAlertLinkHistory: [],
   setupChecklist: {
     obsStep1LinksCopied: true,
     obsStep2SourceCreated: true,
@@ -150,6 +166,12 @@ function loadSettings(): AppSettings {
         webhookLogs: Array.isArray(parsed.webhookLogs)
           ? parsed.webhookLogs
           : DEFAULT_SETTINGS.webhookLogs,
+        goalLinkHistory: Array.isArray(parsed.goalLinkHistory)
+          ? parsed.goalLinkHistory
+          : [],
+        textAlertLinkHistory: Array.isArray(parsed.textAlertLinkHistory)
+          ? parsed.textAlertLinkHistory
+          : [],
       };
     }
   } catch (err) {
@@ -230,6 +252,136 @@ function createFallbackWavBuffer(durationSec = 1.6): Buffer {
     buffer.writeInt16LE(Math.floor(sample * 32767), 44 + i * 2);
   }
   return buffer;
+}
+
+// In-memory TTS audio cache so /api/tts responds in <1ms with zero delay when an alert triggers
+const ttsAudioCache = new Map<string, { buffer: Buffer; contentType: string; cachedAt: number }>();
+
+const NEURAL_STREAMER_VOICES: Record<string, string> = {
+  'pro-hype-male': 'en_us_006',
+  'pro-caster-female': 'en_us_001',
+  'pro-vip-narrator': 'en_male_narration',
+  'pro-uk-gent': 'en_uk_001',
+  'pro-emotional-female': 'en_female_emotional',
+  'pro-funny-male': 'en_male_funny',
+  'pro-aussie-chill': 'en_au_001',
+  'en-US': 'en_us_006',
+  'en-GB': 'en_uk_001',
+};
+
+function toGoogleFallbackLang(lang: string): string {
+  if (lang === 'pro-uk-gent') return 'en-GB';
+  if (lang === 'pro-aussie-chill') return 'en-AU';
+  if (lang.startsWith('pro-')) return 'en-US';
+  return lang;
+}
+
+function saveTtsCache(cacheKey: string, buffer: Buffer, contentType = 'audio/mpeg'): void {
+  if (ttsAudioCache.size > 200) {
+    const oldestKey = ttsAudioCache.keys().next().value;
+    if (oldestKey) ttsAudioCache.delete(oldestKey);
+  }
+  ttsAudioCache.set(cacheKey, {
+    buffer,
+    contentType,
+    cachedAt: Date.now(),
+  });
+}
+
+async function fetchOrBuildTtsAudio(
+  rawText: string,
+  rawLang: string
+): Promise<{ buffer: Buffer; contentType: string }> {
+  const spoken = convertEmojisToSpokenText(String(rawText || ''));
+  const text = (spoken || String(rawText || 'Welcome to sujalxsaini stream!')).slice(0, 240);
+  const lang = String(rawLang || 'pro-hype-male');
+  const cacheKey = `${lang}::${text}`;
+  const existing = ttsAudioCache.get(cacheKey);
+  if (existing && Date.now() - existing.cachedAt < 1000 * 60 * 60) {
+    return { buffer: existing.buffer, contentType: existing.contentType };
+  }
+
+  // 1. Primary Studio Neural Streamer Voice Provider (TikTok Neural TTS)
+  const neuralVoiceId = NEURAL_STREAMER_VOICES[lang];
+  if (neuralVoiceId) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3500);
+      const response = await fetch('https://tiktok-tts.weilnet.workers.dev/api/generation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice: neuralVoiceId }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (response.ok) {
+        const json = (await response.json()) as { success?: boolean; data?: string | null };
+        if (json.success && typeof json.data === 'string' && json.data.length > 200) {
+          const buf = Buffer.from(json.data, 'base64');
+          if (buf.byteLength > 256) {
+            saveTtsCache(cacheKey, buf, 'audio/mpeg');
+            return { buffer: buf, contentType: 'audio/mpeg' };
+          }
+        }
+      }
+    } catch {
+      // Fall back cleanly to Google Translate TTS below
+    }
+  }
+
+  // 2. High-clarity Google GTX / TW-OB Fallback (also primary for hi-IN, en-IN, ja-JP, es-ES)
+  const fallbackLang = toGoogleFallbackLang(lang);
+  const googleUrls = [
+    `https://translate.googleapis.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
+      text
+    )}&tl=${encodeURIComponent(fallbackLang)}&client=gtx`,
+    `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
+      text
+    )}&tl=${encodeURIComponent(fallbackLang)}&client=tw-ob`,
+  ];
+
+  for (const ttsUrl of googleUrls) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3500);
+      const response = await fetch(ttsUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Referer: 'https://translate.google.com/',
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (response.ok && response.body) {
+        const arrayBuf = await response.arrayBuffer();
+        if (arrayBuf.byteLength > 256) {
+          const buf = Buffer.from(arrayBuf);
+          saveTtsCache(cacheKey, buf, 'audio/mpeg');
+          return { buffer: buf, contentType: 'audio/mpeg' };
+        }
+      }
+    } catch {
+      // Try next fallback URL
+    }
+  }
+
+  return {
+    buffer: createFallbackWavBuffer(Math.min(3.5, Math.max(1.4, text.length * 0.045))),
+    contentType: 'audio/wav',
+  };
+}
+
+async function prewarmTtsAudio(text: string, lang: string): Promise<void> {
+  try {
+    await Promise.race([
+      fetchOrBuildTtsAudio(text, lang),
+      new Promise<void>((resolve) => setTimeout(resolve, 1200)),
+    ]);
+  } catch {
+    // Ignore prewarm timeout
+  }
 }
 
 async function startServer() {
@@ -344,11 +496,12 @@ async function startServer() {
 
   // 5. Adjust Follower Count & Goal Target
   app.post('/api/counter-adjust', (req: Request, res: Response) => {
-    const { delta, exactCount, exactGoal, goalTitle } = req.body as {
+    const { delta, exactCount, exactGoal, goalTitle, goalLinkId } = req.body as {
       delta?: number;
       exactCount?: number;
       exactGoal?: number;
       goalTitle?: string;
+      goalLinkId?: string;
     };
 
     if (typeof exactCount === 'number' && Number.isFinite(exactCount)) {
@@ -368,6 +521,20 @@ async function startServer() {
       appState.goalTitle = goalTitle.trim();
     }
 
+    if (goalLinkId && Array.isArray(appState.goalLinkHistory)) {
+      const nowIso = new Date().toISOString();
+      appState.goalLinkHistory = appState.goalLinkHistory.map((item) =>
+        item.id === goalLinkId
+          ? {
+              ...item,
+              goal: appState.followerGoal,
+              goalTitle: appState.goalTitle,
+              updatedAt: nowIso,
+            }
+          : item
+      );
+    }
+
     saveSettings(appState);
     broadcastEvent('SETTINGS_UPDATED', appState);
 
@@ -379,6 +546,354 @@ async function startServer() {
       });
     }
 
+    res.json({ ok: true, settings: appState });
+  });
+
+  // 5A. Save & Live-Edit Follower Goal Link History (Edit Goal Live Without Changing OBS Link)
+  app.post('/api/goal-links', (req: Request, res: Response) => {
+    const {
+      label,
+      goal,
+      goalTitle,
+      template,
+      font,
+      showGoal = true,
+    } = (req.body || {}) as {
+      label?: string;
+      goal?: number;
+      goalTitle?: string;
+      template?: AppSettings['activeCounterTemplate'];
+      font?: AppSettings['counterFont'];
+      showGoal?: boolean;
+    };
+
+    const nextGoal =
+      typeof goal === 'number' && Number.isFinite(goal) && goal > 0
+        ? Math.round(goal)
+        : appState.followerGoal || 500;
+    const nextTitle =
+      typeof goalTitle === 'string' && goalTitle.trim()
+        ? goalTitle.trim()
+        : `ROAD TO ${nextGoal.toLocaleString()} FOLLOWERS`;
+    const nextTemplate = template || appState.activeCounterTemplate || 'neon';
+    const nextFont = font || appState.counterFont || appState.selectedFont || 'Orbitron';
+    const id = `goal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const nowIso = new Date().toISOString();
+
+    const permanentUrl = buildObsCounterUrl(PUBLIC_RENDER_ORIGIN, {
+      template: nextTemplate,
+      font: nextFont,
+      showGoal: Boolean(showGoal),
+      goalId: id,
+    });
+
+    const newItem: GoalLinkHistoryItem = {
+      id,
+      label:
+        (label || '').trim() ||
+        `${nextTemplate.toUpperCase()} · ${nextGoal.toLocaleString()} Goal`,
+      url: permanentUrl,
+      goal: nextGoal,
+      goalTitle: nextTitle,
+      template: nextTemplate,
+      font: nextFont,
+      showGoal: Boolean(showGoal),
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    appState.followerGoal = nextGoal;
+    appState.goalTitle = nextTitle;
+    appState.activeCounterTemplate = nextTemplate;
+    appState.counterFont = nextFont;
+    appState.showGoalOnCounter = Boolean(showGoal);
+    appState.goalLinkHistory = [
+      newItem,
+      ...(Array.isArray(appState.goalLinkHistory) ? appState.goalLinkHistory : []).slice(0, 29),
+    ];
+
+    saveSettings(appState);
+    broadcastEvent('SETTINGS_UPDATED', appState);
+
+    res.json({ ok: true, item: newItem, settings: appState });
+  });
+
+  app.patch('/api/goal-links/:id', (req: Request, res: Response) => {
+    const targetId = String(req.params.id || '').trim();
+    const { goal, goalTitle, label, template, font, showGoal, syncMain = true } = (req.body ||
+      {}) as {
+      goal?: number;
+      goalTitle?: string;
+      label?: string;
+      template?: AppSettings['activeCounterTemplate'];
+      font?: AppSettings['counterFont'];
+      showGoal?: boolean;
+      syncMain?: boolean;
+    };
+
+    const existingList = Array.isArray(appState.goalLinkHistory)
+      ? appState.goalLinkHistory
+      : [];
+    const target = existingList.find((item) => item.id === targetId);
+    if (!target) {
+      res.status(404).json({ error: 'Saved goal link not found' });
+      return;
+    }
+
+    const updatedGoal =
+      typeof goal === 'number' && Number.isFinite(goal) && goal > 0
+        ? Math.round(goal)
+        : target.goal;
+    const autoGoalTitle =
+      target.goalTitle.startsWith('ROAD TO ') || !goalTitle
+        ? `ROAD TO ${updatedGoal.toLocaleString()} FOLLOWERS`
+        : target.goalTitle;
+    const updatedTitle =
+      typeof goalTitle === 'string' && goalTitle.trim() ? goalTitle.trim() : autoGoalTitle;
+    const nowIso = new Date().toISOString();
+
+    const updatedItem: GoalLinkHistoryItem = {
+      ...target,
+      label: typeof label === 'string' && label.trim() ? label.trim() : target.label,
+      goal: updatedGoal,
+      goalTitle: updatedTitle,
+      template: template || target.template,
+      font: font || target.font,
+      showGoal: typeof showGoal === 'boolean' ? showGoal : target.showGoal,
+      updatedAt: nowIso,
+    };
+
+    appState.goalLinkHistory = existingList.map((item) =>
+      item.id === targetId ? updatedItem : item
+    );
+
+    if (syncMain) {
+      appState.followerGoal = updatedItem.goal;
+      appState.goalTitle = updatedItem.goalTitle;
+      appState.activeCounterTemplate = updatedItem.template;
+      appState.counterFont = updatedItem.font;
+    }
+
+    saveSettings(appState);
+    broadcastEvent('SETTINGS_UPDATED', appState);
+
+    if (isMilestoneReached(appState.followerCount, updatedItem.goal)) {
+      broadcastEvent('MILESTONE_REACHED', {
+        followerCount: appState.followerCount,
+        followerGoal: updatedItem.goal,
+        goalTitle: updatedItem.goalTitle,
+      });
+    }
+
+    res.json({ ok: true, item: updatedItem, settings: appState });
+  });
+
+  app.delete('/api/goal-links/:id', (req: Request, res: Response) => {
+    const targetId = String(req.params.id || '').trim();
+    const existingList = Array.isArray(appState.goalLinkHistory)
+      ? appState.goalLinkHistory
+      : [];
+    appState.goalLinkHistory = existingList.filter((item) => item.id !== targetId);
+    saveSettings(appState);
+    broadcastEvent('SETTINGS_UPDATED', appState);
+    res.json({ ok: true, settings: appState });
+  });
+
+  // 5A-2. Save & Live-Edit Specific Kicks/Subs Text Alert Link History (Edit Live Without Changing Link)
+  app.post('/api/text-alert-links', (req: Request, res: Response) => {
+    const {
+      label,
+      eventFilter = 'all',
+      style,
+      font,
+      sfxPreset,
+      duration,
+      ttsEnabled,
+      voice,
+      rate,
+      volume,
+    } = (req.body || {}) as {
+      label?: string;
+      eventFilter?: TextAlertEventFilter;
+      style?: TextAlertStyle;
+      font?: AppSettings['textAlertFont'];
+      sfxPreset?: AppSettings['sfxPreset'];
+      duration?: number;
+      ttsEnabled?: boolean;
+      voice?: AppSettings['ttsSettings']['lang'];
+      rate?: number;
+      volume?: number;
+    };
+
+    const nextFilter: TextAlertEventFilter =
+      eventFilter === 'kicks' || eventFilter === 'sub-gift' || eventFilter === 'sub-buy'
+        ? eventFilter
+        : 'all';
+    const nextStyle: TextAlertStyle = style || appState.textAlertStyle || 'kinetic-neon';
+    const nextFont = font || appState.textAlertFont || 'Bebas Neue';
+    const nextSfx = sfxPreset || appState.textAlertSfxPreset || appState.sfxPreset || 'royal';
+    const nextDuration =
+      typeof duration === 'number' && Number.isFinite(duration)
+        ? Math.min(20, Math.max(2, Math.round(duration)))
+        : appState.textAlertDuration || 6;
+    const nextTts =
+      typeof ttsEnabled === 'boolean' ? ttsEnabled : appState.ttsSettings.enabled;
+    const nextVoice = voice || appState.ttsSettings.lang || 'pro-hype-male';
+    const nextRate =
+      typeof rate === 'number' && Number.isFinite(rate)
+        ? Math.min(2.0, Math.max(0.5, Number(rate.toFixed(2))))
+        : appState.ttsSettings.rate || 1.0;
+    const nextVolume =
+      typeof volume === 'number' && Number.isFinite(volume)
+        ? Math.min(1.0, Math.max(0.0, Number(volume.toFixed(2))))
+        : appState.ttsSettings.volume ?? 1.0;
+
+    const id = `kicks-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const nowIso = new Date().toISOString();
+
+    const permanentUrl = buildObsTextAlertUrl(PUBLIC_RENDER_ORIGIN, {
+      style: nextStyle,
+      font: nextFont,
+      sfx: nextSfx,
+      tts: nextTts,
+      voice: nextVoice,
+      duration: nextDuration,
+      rate: nextRate,
+      volume: nextVolume,
+      eventFilter: nextFilter,
+      alertId: id,
+    });
+
+    const filterLabelMap: Record<TextAlertEventFilter, string> = {
+      all: 'ALL KICKS & SUBS',
+      kicks: 'KICKS ONLY',
+      'sub-gift': 'SUBS GIFT ONLY',
+      'sub-buy': 'SUB BUY ONLY',
+    };
+
+    const newItem: TextAlertLinkHistoryItem = {
+      id,
+      label:
+        (label || '').trim() ||
+        `${filterLabelMap[nextFilter]} · ${nextStyle.toUpperCase()}`,
+      url: permanentUrl,
+      eventFilter: nextFilter,
+      style: nextStyle,
+      font: nextFont,
+      sfxPreset: nextSfx,
+      duration: nextDuration,
+      ttsEnabled: nextTts,
+      voice: nextVoice,
+      rate: nextRate,
+      volume: nextVolume,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    appState.textAlertStyle = nextStyle;
+    appState.textAlertFont = nextFont;
+    appState.textAlertSfxPreset = nextSfx;
+    appState.textAlertDuration = nextDuration;
+    appState.textAlertLinkHistory = [
+      newItem,
+      ...(Array.isArray(appState.textAlertLinkHistory)
+        ? appState.textAlertLinkHistory
+        : []
+      ).slice(0, 29),
+    ];
+
+    saveSettings(appState);
+    broadcastEvent('SETTINGS_UPDATED', appState);
+
+    res.json({ ok: true, item: newItem, settings: appState });
+  });
+
+  app.patch('/api/text-alert-links/:id', (req: Request, res: Response) => {
+    const targetId = String(req.params.id || '').trim();
+    const {
+      label,
+      eventFilter,
+      style,
+      font,
+      sfxPreset,
+      duration,
+      ttsEnabled,
+      voice,
+      rate,
+      volume,
+      syncMain = true,
+    } = (req.body || {}) as {
+      label?: string;
+      eventFilter?: TextAlertEventFilter;
+      style?: TextAlertStyle;
+      font?: AppSettings['textAlertFont'];
+      sfxPreset?: AppSettings['sfxPreset'];
+      duration?: number;
+      ttsEnabled?: boolean;
+      voice?: AppSettings['ttsSettings']['lang'];
+      rate?: number;
+      volume?: number;
+      syncMain?: boolean;
+    };
+
+    const existingList = Array.isArray(appState.textAlertLinkHistory)
+      ? appState.textAlertLinkHistory
+      : [];
+    const target = existingList.find((item) => item.id === targetId);
+    if (!target) {
+      res.status(404).json({ error: 'Saved Kicks/Subs link not found' });
+      return;
+    }
+
+    const updatedItem: TextAlertLinkHistoryItem = {
+      ...target,
+      label: typeof label === 'string' && label.trim() ? label.trim() : target.label,
+      eventFilter: eventFilter || target.eventFilter,
+      style: style || target.style,
+      font: font || target.font,
+      sfxPreset: sfxPreset || target.sfxPreset || appState.textAlertSfxPreset || 'royal',
+      duration:
+        typeof duration === 'number' && Number.isFinite(duration)
+          ? Math.min(20, Math.max(2, Math.round(duration)))
+          : target.duration,
+      ttsEnabled: typeof ttsEnabled === 'boolean' ? ttsEnabled : target.ttsEnabled,
+      voice: voice || target.voice,
+      rate:
+        typeof rate === 'number' && Number.isFinite(rate)
+          ? Math.min(2.0, Math.max(0.5, Number(rate.toFixed(2))))
+          : target.rate,
+      volume:
+        typeof volume === 'number' && Number.isFinite(volume)
+          ? Math.min(1.0, Math.max(0.0, Number(volume.toFixed(2))))
+          : target.volume,
+      updatedAt: new Date().toISOString(),
+    };
+
+    appState.textAlertLinkHistory = existingList.map((item) =>
+      item.id === targetId ? updatedItem : item
+    );
+
+    if (syncMain) {
+      appState.textAlertStyle = updatedItem.style;
+      appState.textAlertFont = updatedItem.font;
+      appState.textAlertSfxPreset = updatedItem.sfxPreset || 'royal';
+      appState.textAlertDuration = updatedItem.duration;
+    }
+
+    saveSettings(appState);
+    broadcastEvent('SETTINGS_UPDATED', appState);
+
+    res.json({ ok: true, item: updatedItem, settings: appState });
+  });
+
+  app.delete('/api/text-alert-links/:id', (req: Request, res: Response) => {
+    const targetId = String(req.params.id || '').trim();
+    const existingList = Array.isArray(appState.textAlertLinkHistory)
+      ? appState.textAlertLinkHistory
+      : [];
+    appState.textAlertLinkHistory = existingList.filter((item) => item.id !== targetId);
+    saveSettings(appState);
+    broadcastEvent('SETTINGS_UPDATED', appState);
     res.json({ ok: true, settings: appState });
   });
 
@@ -432,7 +947,15 @@ async function startServer() {
   async function ensureKickWebhookSubscription(): Promise<void> {
     const token = await getKickAccessToken();
     if (!token) return;
+    const desiredEvents = [
+      'channel.followed',
+      'kicks.gifted',
+      'channel.subscription.gifts',
+      'channel.subscription.new',
+      'channel.subscription.renewal',
+    ];
     try {
+      let existingNames = new Set<string>();
       const getRes = await fetch(
         'https://api.kick.com/public/v1/events/subscriptions',
         {
@@ -446,17 +969,22 @@ async function startServer() {
         const existing = (await getRes.json()) as {
           data?: Array<{ name?: string; broadcaster_user_id?: number }>;
         };
-        const alreadySubscribed = (existing.data || []).some(
-          (sub) =>
-            sub.name === 'channel.followed' &&
+        for (const sub of existing.data || []) {
+          if (
+            sub.name &&
             (!sub.broadcaster_user_id ||
               sub.broadcaster_user_id === KICK_BROADCASTER_USER_ID)
-        );
-        if (alreadySubscribed) {
-          appState.setupChecklist.webhookStep2AppCreated = true;
-          appState.setupChecklist.webhookStep3SubscribedFollowed = true;
-          return;
+          ) {
+            existingNames.add(sub.name);
+          }
         }
+      }
+
+      const missing = desiredEvents.filter((evt) => !existingNames.has(evt));
+      if (missing.length === 0) {
+        appState.setupChecklist.webhookStep2AppCreated = true;
+        appState.setupChecklist.webhookStep3SubscribedFollowed = true;
+        return;
       }
 
       const postRes = await fetch(
@@ -470,7 +998,7 @@ async function startServer() {
           },
           body: JSON.stringify({
             broadcaster_user_id: KICK_BROADCASTER_USER_ID,
-            events: [{ name: 'channel.followed', version: 1 }],
+            events: missing.map((name) => ({ name, version: 1 })),
             method: 'webhook',
           }),
         }
@@ -595,63 +1123,102 @@ async function startServer() {
     });
   });
 
-  // Shared helper to process a new follower event (from Kick Webhook or Simulator)
-  function processFollowEvent(
+  // Shared helper to process a Kick alert event (Follow, Kicks Send, Sub Gift, Sub Buy)
+  async function processFollowEvent(
     username: string,
     source: 'kick-webhook' | 'simulator' | 'test' | 'replay',
     incrementCount: boolean,
     overrides?: Partial<FollowAlertPayload>
-  ): FollowAlertPayload {
+  ): Promise<FollowAlertPayload> {
     const cleanUsername = (username || 'KickUser').trim();
+    const eventType: AlertEventType = overrides?.eventType || 'follow';
+    const amount = overrides?.amount;
     const nowIso = new Date().toISOString();
 
-    if (incrementCount) {
+    if (incrementCount && eventType === 'follow') {
       appState.followerCount += 1;
     }
+
+    const cleanNote = overrides?.subMessage?.trim() || undefined;
 
     const newFollower: RecentFollower = {
       id: `fol-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       username: cleanUsername,
       timestamp: nowIso,
       source,
-      avatarUrl: overrides?.avatarUrl || appState.customAvatarUrl || undefined,
+      eventType,
+      amount,
+      subMessage: cleanNote,
+      avatarUrl:
+        eventType === 'follow'
+          ? overrides?.avatarUrl || appState.customAvatarUrl || undefined
+          : undefined,
     };
 
     appState.recentFollowers = [
       newFollower,
-      ...appState.recentFollowers
-        .filter((f) => f.username.toLowerCase() !== cleanUsername.toLowerCase())
-        .slice(0, 29),
+      ...appState.recentFollowers.slice(0, 29),
     ];
 
     saveSettings(appState);
 
-    const ttsMessage = formatTtsMessage(
-      appState.ttsSettings.messageTemplate,
-      cleanUsername,
-      appState.channelName
-    );
+    const ttsMessage =
+      overrides?.ttsMessage ||
+      formatEventTtsText(
+        eventType,
+        cleanUsername,
+        amount,
+        appState.ttsSettings.messageTemplate,
+        appState.channelName,
+        cleanNote
+      );
+
+    const ttsEnabled = overrides?.ttsEnabled ?? appState.ttsSettings.enabled;
+    const ttsLang = overrides?.ttsLang || appState.ttsSettings.lang;
+
+    // Pre-warm TTS audio into RAM cache BEFORE broadcasting SSE so OBS speaks with 0ms delay
+    if (ttsEnabled && !appState.alertsMuted) {
+      await prewarmTtsAudio(ttsMessage, ttsLang);
+    }
+
+    const isTextOnly = eventType !== 'follow';
 
     const alertPayload: FollowAlertPayload = {
       id: newFollower.id,
+      eventType,
+      amount,
+      subMessage: overrides?.subMessage,
+      textStyle: overrides?.textStyle || appState.textAlertStyle || 'kinetic-neon',
       username: cleanUsername,
       avatarUrl: newFollower.avatarUrl,
       timestamp: nowIso,
       source,
       followerCount: appState.followerCount,
       template: overrides?.template || appState.activeAlertTemplate,
-      font: overrides?.font || appState.selectedFont,
-      sfxPreset: overrides?.sfxPreset || appState.sfxPreset,
-      duration: overrides?.duration || appState.alertDuration,
-      ttsEnabled: overrides?.ttsEnabled ?? appState.ttsSettings.enabled,
-      ttsLang: overrides?.ttsLang || appState.ttsSettings.lang,
-      ttsMessage: overrides?.ttsMessage || ttsMessage,
+      font:
+        overrides?.font ||
+        (isTextOnly ? appState.textAlertFont || 'Bebas Neue' : appState.selectedFont),
+      sfxPreset:
+        overrides?.sfxPreset ||
+        (isTextOnly
+          ? appState.textAlertSfxPreset || appState.sfxPreset || 'royal'
+          : appState.sfxPreset),
+      duration:
+        overrides?.duration ||
+        (isTextOnly ? appState.textAlertDuration || 6 : appState.alertDuration),
+      ttsEnabled,
+      ttsLang,
+      ttsMessage,
     };
 
     broadcastEvent('SETTINGS_UPDATED', appState);
     broadcastEvent('FOLLOW_ALERT', alertPayload);
 
-    if (incrementCount && isMilestoneReached(appState.followerCount, appState.followerGoal)) {
+    if (
+      incrementCount &&
+      eventType === 'follow' &&
+      isMilestoneReached(appState.followerCount, appState.followerGoal)
+    ) {
       broadcastEvent('MILESTONE_REACHED', {
         followerCount: appState.followerCount,
         followerGoal: appState.followerGoal,
@@ -669,11 +1236,14 @@ async function startServer() {
         req.headers['kick-event-type'] ||
           req.headers['x-kick-event'] ||
           req.body?.event ||
+          req.body?.event_type ||
+          req.body?.type ||
           'channel.followed'
       ) || 'channel.followed';
 
-    const username = extractFollowerUsername(req.body);
-    let avatarUrl = extractFollowerAvatar(req.body);
+    const details = parseKickEventDetails(eventHeader, req.body);
+    const username = details.username || extractFollowerUsername(req.body);
+    let avatarUrl = details.avatarUrl;
     const nowIso = new Date().toISOString();
 
     const sanitizedHeaders: Record<string, string> = {};
@@ -705,22 +1275,34 @@ async function startServer() {
     res.status(200).json({
       received: true,
       event: eventHeader,
-      follower: username,
-      followerCount: appState.followerCount + 1,
+      eventType: details.eventType,
+      username,
+      amount: details.amount,
+      followerCount:
+        details.eventType === 'follow'
+          ? appState.followerCount + 1
+          : appState.followerCount,
     });
 
-    // Fetch real follower PFP from Kick if not already in webhook payload
-    if (!avatarUrl && username && username !== 'KickUser') {
+    if (details.eventType === 'follow' && !avatarUrl && username && username !== 'KickUser') {
       avatarUrl = await fetchKickUserAvatar(username);
     }
 
-    processFollowEvent(username, isSimulated ? 'simulator' : 'kick-webhook', true, {
-      avatarUrl,
-    });
+    await processFollowEvent(
+      username,
+      isSimulated ? 'simulator' : 'kick-webhook',
+      details.eventType === 'follow',
+      {
+        eventType: details.eventType,
+        amount: details.amount,
+        subMessage: details.subMessage,
+        avatarUrl,
+      }
+    );
     broadcastEvent('WEBHOOK_RECEIVED', logEntry);
 
-    // Sync exact real follower total from Kick API right after a real webhook
-    if (!isSimulated) {
+    // Sync exact real follower total from Kick API right after a real follow webhook
+    if (!isSimulated && details.eventType === 'follow') {
       setTimeout(() => {
         syncKickChannelFollowers(appState.channelName).catch(() => {});
       }, 1500);
@@ -728,33 +1310,34 @@ async function startServer() {
   });
 
   // 7. Webhook Simulator Endpoint (POST /api/webhook/simulate)
-  app.post('/api/webhook/simulate', (req: Request, res: Response) => {
-    const username = extractFollowerUsername(req.body);
+  app.post('/api/webhook/simulate', async (req: Request, res: Response) => {
+    const bodyObj = (req.body || {}) as Record<string, unknown>;
+    const eventHeader = String(bodyObj.eventType || bodyObj.event || 'channel.followed');
+    const details = parseKickEventDetails(eventHeader, req.body);
+    const username = details.username || extractFollowerUsername(req.body);
     const nowIso = new Date().toISOString();
 
     const simulatedPayload = {
-      event: 'channel.followed',
+      event: eventHeader,
       channel: {
         id: 29740496,
         slug: appState.channelName || 'sujalxsaini',
         url: appState.channelUrl || 'https://kick.com/sujalxsaini',
       },
-      follower: {
-        username,
-        slug: username.toLowerCase().replace(/[^a-z0-9_]/g, ''),
-        verified: true,
-      },
+      username,
+      amount: details.amount,
+      ...(details.subMessage ? { message: details.subMessage } : {}),
       created_at: nowIso,
     };
 
     const logEntry: WebhookLogEntry = {
       id: `wh-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       timestamp: nowIso,
-      eventType: 'channel.followed',
+      eventType: eventHeader,
       username,
       status: 200,
       headers: {
-        'kick-event-type': 'channel.followed',
+        'kick-event-type': eventHeader,
         'content-type': 'application/json',
         'x-sujalx-simulator': 'true',
       },
@@ -764,7 +1347,16 @@ async function startServer() {
     appState.webhookLogs = [logEntry, ...appState.webhookLogs.slice(0, 39)];
     appState.setupChecklist.webhookStep4SimulatedTest = true;
 
-    const alertPayload = processFollowEvent(username, 'simulator', true);
+    const alertPayload = await processFollowEvent(
+      username,
+      'simulator',
+      details.eventType === 'follow',
+      {
+        eventType: details.eventType,
+        amount: details.amount,
+        subMessage: details.subMessage,
+      }
+    );
     broadcastEvent('WEBHOOK_RECEIVED', logEntry);
 
     res.status(200).json({
@@ -775,11 +1367,15 @@ async function startServer() {
     });
   });
 
-  // 8. Fire Test Alert + TTS
-  app.post('/api/test-alert', (req: Request, res: Response) => {
+  // 8. Fire Test Alert + Exact-Time TTS (Follow, Kicks Send, Sub Gift, Sub Buy)
+  app.post('/api/test-alert', async (req: Request, res: Response) => {
     const {
       username = 'SujalVIP_Fan',
       incrementCount = false,
+      eventType = 'follow',
+      amount,
+      subMessage,
+      textStyle,
       template,
       font,
       sfxPreset,
@@ -787,26 +1383,53 @@ async function startServer() {
     } = (req.body || {}) as {
       username?: string;
       incrementCount?: boolean;
+      eventType?: AlertEventType;
+      amount?: number;
+      subMessage?: string;
+      textStyle?: TextAlertStyle;
       template?: AppSettings['activeAlertTemplate'];
       font?: AppSettings['selectedFont'];
       sfxPreset?: AppSettings['sfxPreset'];
       ttsLang?: AppSettings['ttsSettings']['lang'];
     };
 
-    const alertPayload = processFollowEvent(username, 'test', Boolean(incrementCount), {
-      template,
-      font,
-      sfxPreset,
-      ttsLang,
-    });
+    const alertPayload = await processFollowEvent(
+      username,
+      'test',
+      Boolean(incrementCount) && eventType === 'follow',
+      {
+        eventType,
+        amount,
+        subMessage,
+        textStyle,
+        template,
+        font,
+        sfxPreset,
+        ttsLang,
+      }
+    );
 
     res.json({ ok: true, alert: alertPayload, settings: appState });
   });
 
   // 9. Replay Alert from Recent Followers Feed
-  app.post('/api/replay-alert', (req: Request, res: Response) => {
-    const { username = 'KickVIP' } = (req.body || {}) as { username?: string };
-    const alertPayload = processFollowEvent(username, 'replay', false);
+  app.post('/api/replay-alert', async (req: Request, res: Response) => {
+    const {
+      username = 'KickVIP',
+      eventType = 'follow',
+      amount,
+      subMessage,
+    } = (req.body || {}) as {
+      username?: string;
+      eventType?: AlertEventType;
+      amount?: number;
+      subMessage?: string;
+    };
+    const alertPayload = await processFollowEvent(username, 'replay', false, {
+      eventType,
+      amount,
+      subMessage,
+    });
     res.json({ ok: true, alert: alertPayload });
   });
 
@@ -873,45 +1496,18 @@ async function startServer() {
     res.json({ ok: true, settings: appState });
   });
 
-  // 13. Multi-Accent OBS Text-to-Speech Proxy (GET /api/tts)
+  // 13. Multi-Accent & Studio Neural Zero-Delay OBS Text-to-Speech Proxy (GET /api/tts)
   app.get('/api/tts', async (req: Request, res: Response) => {
     const text = String(req.query.text || 'Welcome to sujalxsaini stream!').slice(0, 240);
-    const lang = String(req.query.lang || 'en-US');
+    const lang = String(req.query.lang || req.query.voice || 'pro-hype-male');
 
-    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
-      text
-    )}&tl=${encodeURIComponent(lang)}&client=tw-ob`;
-
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4500);
-      const response = await fetch(ttsUrl, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          Referer: 'https://translate.google.com/',
-        },
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-
-      if (response.ok && response.body) {
-        const arrayBuf = await response.arrayBuffer();
-        if (arrayBuf.byteLength > 256) {
-          res.setHeader('Content-Type', 'audio/mpeg');
-          res.setHeader('Cache-Control', 'public, max-age=3600');
-          res.send(Buffer.from(arrayBuf));
-          return;
-        }
-      }
-    } catch {
-      // Fallback to generated harmonic audio buffer if network is restricted
-    }
-
-    const fallbackWav = createFallbackWavBuffer(Math.min(3.5, Math.max(1.4, text.length * 0.045)));
-    res.setHeader('Content-Type', 'audio/wav');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.send(fallbackWav);
+    const audio = await fetchOrBuildTtsAudio(text, lang);
+    res.setHeader('Content-Type', audio.contentType);
+    res.setHeader(
+      'Cache-Control',
+      audio.contentType === 'audio/mpeg' ? 'public, max-age=3600' : 'no-cache'
+    );
+    res.send(audio.buffer);
   });
 
   // Vite middleware in development, static dist in production

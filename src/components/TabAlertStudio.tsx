@@ -14,6 +14,7 @@ import {
   Link2,
 } from 'lucide-react';
 import type {
+  AlertEventType,
   AlertTemplateId,
   AppSettings,
   FontFamilyName,
@@ -42,7 +43,15 @@ interface TabAlertStudioProps {
   previewUsername: string;
   onPreviewUsernameChange: (name: string) => void;
   onUpdateSettings: (partial: Partial<AppSettings>) => Promise<void>;
-  onFireTestAlert: (customUsername?: string) => Promise<void>;
+  onFireTestAlert: (
+    customUsername?: string,
+    eventOptions?: {
+      eventType?: AlertEventType;
+      amount?: number;
+      subMessage?: string;
+    }
+  ) => Promise<void>;
+  onOpenKicksSubsTab?: () => void;
 }
 
 const SAMPLE_PREVIEW_USERNAMES = [
@@ -60,6 +69,7 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
   onPreviewUsernameChange,
   onUpdateSettings,
   onFireTestAlert,
+  onOpenKicksSubsTab,
 }) => {
   const [isSpeakingPreview, setIsSpeakingPreview] = useState(false);
   const [highlightedGeneratorTemplate, setHighlightedGeneratorTemplate] =
@@ -409,19 +419,38 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
                         ttsSettings: {
                           ...settings.ttsSettings,
                           enabled: true,
-                          lang: 'en-US',
+                          lang: 'pro-hype-male',
                         },
                       });
                       setSavedSingleLinkBanner(true);
                     }}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border cursor-pointer ${
-                      settings.ttsSettings.lang === 'en-US' ||
+                      settings.ttsSettings.lang.startsWith('pro-')
+                        ? 'bg-[#53FC18]/20 border-[#53FC18] text-[#53FC18]'
+                        : 'bg-slate-900 border-slate-700 text-slate-300'
+                    }`}
+                  >
+                    Pro Neural
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onUpdateSettings({
+                        ttsSettings: {
+                          ...settings.ttsSettings,
+                          enabled: true,
+                          lang: 'en-IN',
+                        },
+                      });
+                      setSavedSingleLinkBanner(true);
+                    }}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border cursor-pointer ${
                       settings.ttsSettings.lang === 'en-IN'
                         ? 'bg-[#53FC18]/20 border-[#53FC18] text-[#53FC18]'
                         : 'bg-slate-900 border-slate-700 text-slate-300'
                     }`}
                   >
-                    English
+                    EN-IN
                   </button>
                   <button
                     type="button"
@@ -649,6 +678,31 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
           }
         />
       </div>
+
+      {/* Dedicated Kicks Send, Subs Gift & Sub Buy Studio Callout */}
+      <section className="rounded-xl bg-[#0D131C] border border-amber-400/40 p-5 flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="text-xs font-mono text-amber-300 uppercase tracking-wider">
+            Kicks Send · Subs Gift · Sub Buy · Pure Text + 0ms TTS + Link History
+          </div>
+          <h2 className="text-base font-bold text-white">
+            Dedicated Kicks &amp; Subs Studio + Saved Link History &amp; Live Editor
+          </h2>
+          <p className="text-xs text-slate-400">
+            Generate specific Kicks-only or Subs OBS links (zero box, zero PFP, cool animated fonts, 0ms TTS) and edit saved links live without changing your OBS URL.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          data-testid="jump-to-kicks-subs-btn"
+          onClick={() => onOpenKicksSubsTab?.()}
+          className="inline-flex items-center gap-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs px-4 py-2.5 transition-colors cursor-pointer shrink-0"
+        >
+          <Zap className="w-4 h-4" />
+          <span>Open Kicks &amp; Subs Studio</span>
+        </button>
+      </section>
 
       {/* 6 Ultra-Premium Follower Alert + Animated TTS Templates (Spacious 2-Column Grid so Zero Boxes Cut Out) */}
       <section className="space-y-4">
@@ -930,18 +984,18 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
                   onUpdateSettings({
                     ttsSettings: {
                       ...settings.ttsSettings,
-                      lang: 'en-IN',
+                      lang: 'pro-hype-male',
                     },
                   });
                   setSavedSingleLinkBanner(true);
                 }}
                 className={`py-2 px-2.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                  settings.ttsSettings.lang.startsWith('en')
+                  settings.ttsSettings.lang.startsWith('pro-')
                     ? 'bg-[#53FC18]/20 border-[#53FC18] text-[#53FC18]'
                     : 'bg-[#080B11] border-slate-800 text-slate-300 hover:border-slate-700'
                 }`}
               >
-                English Accent
+                Pro Neural Voices
               </button>
               <button
                 type="button"

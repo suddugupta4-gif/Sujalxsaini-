@@ -2,29 +2,140 @@
   "channelName": "sujalxsaini",
   "channelUrl": "https://kick.com/sujalxsaini",
   "pin": "1234",
-  "followerCount": 462,
+  "followerCount": 465,
   "followerGoal": 500,
   "goalTitle": "ROAD TO 500 FOLLOWERS",
   "showGoalOnCounter": true,
   "alertsPaused": false,
-  "alertsMuted": true,
+  "alertsMuted": false,
   "activeAlertTemplate": "neon",
   "activeCounterTemplate": "neon",
   "selectedFont": "Rajdhani",
   "counterFont": "Orbitron",
+  "textAlertFont": "Orbitron",
+  "textAlertStyle": "gold-impact",
+  "textAlertDuration": 6,
+  "textAlertSfxPreset": "valorant",
   "alertDuration": 5,
   "sfxPreset": "cyber",
   "customSfxUrl": "",
   "ttsSettings": {
-    "enabled": false,
+    "enabled": true,
     "mode": "stream",
-    "lang": "hi-IN",
+    "lang": "pro-caster-female",
     "messageTemplate": "{username} started following",
     "rate": 1,
     "pitch": 1,
-    "volume": 0.1
+    "volume": 1
   },
   "recentFollowers": [
+    {
+      "id": "fol-1794560636203-gs6p",
+      "username": "KaranClutchX",
+      "timestamp": "2026-11-13T09:03:56.203Z",
+      "source": "simulator",
+      "eventType": "sub-gift",
+      "amount": 5
+    },
+    {
+      "id": "fol-1794560611326-knsr",
+      "username": "RohanGamingIN",
+      "timestamp": "2026-11-13T09:03:31.326Z",
+      "source": "test",
+      "eventType": "sub-gift",
+      "amount": 5,
+      "subMessage": "OP clutch squad! 🔥❤️"
+    },
+    {
+      "id": "fol-1794560596784-xzyo",
+      "username": "WebhookGifter",
+      "timestamp": "2026-11-13T09:03:16.784Z",
+      "source": "simulator",
+      "eventType": "kicks",
+      "amount": 250,
+      "subMessage": "GG ❤️🔥"
+    },
+    {
+      "id": "fol-1794560595574-fsix",
+      "username": "SubGiftTester",
+      "timestamp": "2026-11-13T09:03:15.574Z",
+      "source": "test",
+      "eventType": "sub-gift",
+      "amount": 5,
+      "subMessage": "Let us go squad! 🔥👑"
+    },
+    {
+      "id": "fol-1794560594364-q3yo",
+      "username": "GiftTesterNoNote",
+      "timestamp": "2026-11-13T09:03:14.364Z",
+      "source": "test",
+      "eventType": "kicks",
+      "amount": 500
+    },
+    {
+      "id": "fol-1794560420316-8fnu",
+      "username": "RohanGamingIN",
+      "timestamp": "2026-11-13T09:00:20.316Z",
+      "source": "test",
+      "eventType": "kicks",
+      "amount": 500
+    },
+    {
+      "id": "fol-1794560401619-v4gx",
+      "username": "RohanGamingIN",
+      "timestamp": "2026-11-13T09:00:01.619Z",
+      "source": "test",
+      "eventType": "sub-buy",
+      "amount": 1
+    },
+    {
+      "id": "fol-1794560391568-g9pk",
+      "username": "RohanGamingIN",
+      "timestamp": "2026-11-13T08:59:51.568Z",
+      "source": "test",
+      "eventType": "sub-gift",
+      "amount": 5
+    },
+    {
+      "id": "fol-1794559063378-pss8",
+      "username": "SujalVIP_Gold",
+      "timestamp": "2026-11-13T08:37:43.378Z",
+      "source": "test",
+      "eventType": "kicks",
+      "amount": 1000
+    },
+    {
+      "id": "fol-1794559059785-lzax",
+      "username": "KaranClutchX",
+      "timestamp": "2026-11-13T08:37:39.785Z",
+      "source": "test",
+      "eventType": "kicks",
+      "amount": 500
+    },
+    {
+      "id": "fol-1794558505161-ysws",
+      "username": "AaravSniper_IN",
+      "timestamp": "2026-11-13T08:28:25.161Z",
+      "source": "simulator",
+      "eventType": "sub-gift",
+      "amount": 3
+    },
+    {
+      "id": "fol-1794558310686-om3n",
+      "username": "RohanGamingIN",
+      "timestamp": "2026-11-13T08:25:10.686Z",
+      "source": "simulator",
+      "eventType": "sub-gift",
+      "amount": 5
+    },
+    {
+      "id": "fol-1794558304916-j4je",
+      "username": "KaranClutchX",
+      "timestamp": "2026-11-13T08:25:04.916Z",
+      "source": "simulator",
+      "eventType": "kicks",
+      "amount": 500
+    },
     {
       "id": "fol-1794507537516-cu4o",
       "username": "ShooterSainiisLive",
@@ -64,6 +175,156 @@
     }
   ],
   "webhookLogs": [
+    {
+      "id": "wh-1794560636202-hasj",
+      "timestamp": "2026-11-13T09:03:56.202Z",
+      "eventType": "channel.subscription.gifts",
+      "username": "KaranClutchX",
+      "status": 200,
+      "headers": {
+        "host": "localhost:3000",
+        "connection": "keep-alive",
+        "content-type": "application/json",
+        "kick-event-type": "channel.subscription.gifts",
+        "x-sujalx-simulated": "true",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "51"
+      },
+      "payload": {
+        "gifter": {
+          "username": "KaranClutchX"
+        },
+        "quantity": 5
+      }
+    },
+    {
+      "id": "wh-1794560596783-p9ap",
+      "timestamp": "2026-11-13T09:03:16.783Z",
+      "eventType": "kicks.gifted",
+      "username": "WebhookGifter",
+      "status": 200,
+      "headers": {
+        "host": "localhost:3000",
+        "connection": "keep-alive",
+        "content-type": "application/json",
+        "kick-event-type": "kicks.gifted",
+        "x-sujalx-simulated": "true",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "87"
+      },
+      "payload": {
+        "sender": {
+          "username": "WebhookGifter"
+        },
+        "gift": {
+          "amount": 250,
+          "message": "GG ❤️🔥"
+        }
+      }
+    },
+    {
+      "id": "wh-1794558505160-u60d",
+      "timestamp": "2026-11-13T08:28:25.160Z",
+      "eventType": "channel.subscription.gifts",
+      "username": "AaravSniper_IN",
+      "status": 200,
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/7.88.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "kick-event-type": "channel.subscription.gifts",
+        "x-sujalx-simulated": "true",
+        "content-length": "106"
+      },
+      "payload": {
+        "gifter": {
+          "username": "AaravSniper_IN"
+        },
+        "giftees": [
+          {
+            "username": "u1"
+          },
+          {
+            "username": "u2"
+          },
+          {
+            "username": "u3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "wh-1794558310686-agoa",
+      "timestamp": "2026-11-13T08:25:10.686Z",
+      "eventType": "channel.subscription.gifts",
+      "username": "RohanGamingIN",
+      "status": 200,
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/7.88.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "kick-event-type": "channel.subscription.gifts",
+        "x-sujalx-simulated": "true",
+        "content-length": "141"
+      },
+      "payload": {
+        "gifter": {
+          "username": "RohanGamingIN"
+        },
+        "giftees": [
+          {
+            "username": "u1"
+          },
+          {
+            "username": "u2"
+          },
+          {
+            "username": "u3"
+          },
+          {
+            "username": "u4"
+          },
+          {
+            "username": "u5"
+          }
+        ]
+      }
+    },
+    {
+      "id": "wh-1794558304915-dmnr",
+      "timestamp": "2026-11-13T08:25:04.915Z",
+      "eventType": "kicks.gifted",
+      "username": "KaranClutchX",
+      "status": 200,
+      "headers": {
+        "host": "localhost:3000",
+        "user-agent": "curl/7.88.1",
+        "accept": "*/*",
+        "content-type": "application/json",
+        "kick-event-type": "kicks.gifted",
+        "x-sujalx-simulated": "true",
+        "content-length": "88"
+      },
+      "payload": {
+        "sender": {
+          "username": "KaranClutchX"
+        },
+        "gift": {
+          "amount": 500,
+          "message": "OP clutch bhai!"
+        }
+      }
+    },
     {
       "id": "wh-1794507537516-dmqs",
       "timestamp": "2026-11-12T18:18:57.516Z",
@@ -225,6 +486,21 @@
       }
     }
   ],
+  "goalLinkHistory": [
+    {
+      "id": "goal-mweqhqhm-9v4q",
+      "label": "NEON · 500 Goal",
+      "url": "https://sujalx-kick-studio.onrender.com/?obs=counter&template=neon&font=Orbitron&showGoal=1&goalId=goal-mweqhqhm-9v4q",
+      "goal": 500,
+      "goalTitle": "ROAD TO 500 FOLLOWERS",
+      "template": "neon",
+      "font": "Orbitron",
+      "showGoal": true,
+      "createdAt": "2026-11-13T08:47:48.826Z",
+      "updatedAt": "2026-11-13T09:01:57.776Z"
+    }
+  ],
+  "textAlertLinkHistory": [],
   "setupChecklist": {
     "obsStep1LinksCopied": true,
     "obsStep2SourceCreated": true,

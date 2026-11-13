@@ -10,11 +10,14 @@ import {
   Link2,
   RefreshCw,
   Radio,
+  History,
+  Trash2,
 } from 'lucide-react';
 import type {
   AppSettings,
   CounterTemplateId,
   FontFamilyName,
+  GoalLinkHistoryItem,
   ObsClientCounts,
 } from '../types';
 import {
@@ -61,6 +64,24 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
   const [savedGoalBanner, setSavedGoalBanner] = useState(false);
   const [copiedSingleGoalLink, setCopiedSingleGoalLink] = useState(false);
   const [isSyncingFollowers, setIsSyncingFollowers] = useState(false);
+  const [activeGoalLinkId, setActiveGoalLinkId] = useState<string | null>(
+    settings.goalLinkHistory?.[0]?.id || null
+  );
+  const [historyGoalDrafts, setHistoryGoalDrafts] = useState<Record<string, string>>({});
+  const [historyTitleDrafts, setHistoryTitleDrafts] = useState<Record<string, string>>({});
+  const [historyMetaDrafts, setHistoryMetaDrafts] = useState<
+    Record<
+      string,
+      {
+        label?: string;
+        template?: CounterTemplateId;
+        font?: FontFamilyName;
+        showGoal?: boolean;
+      }
+    >
+  >({});
+  const [savedHistoryId, setSavedHistoryId] = useState<string | null>(null);
+  const [copiedHistoryId, setCopiedHistoryId] = useState<string | null>(null);
 
   const goalConfigRef = useRef<HTMLDivElement | null>(null);
   const goalInputFieldRef = useRef<HTMLInputElement | null>(null);
@@ -75,6 +96,13 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
       setGoalTitleInput(settings.goalTitle);
     }
   }, [settings.goalTitle]);
+
+  useEffect(() => {
+    const historyList = settings.goalLinkHistory || [];
+    if (!activeGoalLinkId && historyList[0]?.id) {
+      setActiveGoalLinkId(historyList[0].id);
+    }
+  }, [settings.goalLinkHistory, activeGoalLinkId]);
 
   // Automatically detect / sync real followers on mount
   useEffect(() => {
@@ -93,12 +121,17 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
       ? parsedDraftGoal
       : settings.followerGoal;
 
-  const generatedCounterUrl = buildObsCounterUrl(origin, {
-    template: settings.activeCounterTemplate,
-    font: activeFont,
-    showGoal: settings.showGoalOnCounter ?? true,
-    goal: effectiveGoal,
-  });
+  const activeHistoryItem: GoalLinkHistoryItem | undefined = (
+    settings.goalLinkHistory || []
+  ).find((item) => item.id === activeGoalLinkId);
+
+  const generatedCounterUrl = activeHistoryItem
+    ? activeHistoryItem.url
+    : buildObsCounterUrl(origin, {
+        template: settings.activeCounterTemplate,
+        font: activeFont,
+        showGoal: settings.showGoalOnCounter ?? true,
+      });
 
   const activeTemplateMeta =
     COUNTER_TEMPLATES.find((t) => t.id === settings.activeCounterTemplate) ||
@@ -118,6 +151,7 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
     }
   };
 
+  // Generates a new persistent Follower Goal link and saves it in Goal Link History
   const handleApplyGoalAndGenerateLink = async (
     customGoalValue?: number,
     customTemplateId?: CounterTemplateId,
@@ -140,27 +174,44 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
         : `ROAD TO ${nextGoal.toLocaleString()} FOLLOWERS`;
     setGoalTitleInput(nextTitle);
 
-    if (customTemplateId || customFont) {
-      await onUpdateSettings({
-        ...(customTemplateId ? { activeCounterTemplate: customTemplateId } : {}),
-        ...(customFont ? { counterFont: customFont } : {}),
+    const nextTemplate = customTemplateId || settings.activeCounterTemplate;
+    const nextFont = customFont || activeFont;
+
+    let finalUrl = generatedCounterUrl;
+
+    try {
+      const res = await fetch('/api/goal-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          goal: nextGoal,
+          goalTitle: nextTitle,
+          template: nextTemplate,
+          font: nextFont,
+          showGoal: settings.showGoalOnCounter ?? true,
+        }),
+      });
+      const json = (await res.json()) as {
+        ok?: boolean;
+        item?: GoalLinkHistoryItem;
+        settings?: AppSettings;
+      };
+      if (json?.settings) {
+        await onUpdateSettings({ goalLinkHistory: json.settings.goalLinkHistory });
+      }
+      if (json?.item) {
+        setActiveGoalLinkId(json.item.id);
+        finalUrl = json.item.url;
+      }
+    } catch {
+      await onAdjustCounter({
+        exactGoal: nextGoal,
+        goalTitle: nextTitle,
       });
     }
 
-    await onAdjustCounter({
-      exactGoal: nextGoal,
-      goalTitle: nextTitle,
-    });
-
-    const nextUrl = buildObsCounterUrl(origin, {
-      template: customTemplateId || settings.activeCounterTemplate,
-      font: customFont || activeFont,
-      showGoal: settings.showGoalOnCounter ?? true,
-      goal: nextGoal,
-    });
-
     try {
-      await navigator.clipboard.writeText(nextUrl);
+      await navigator.clipboard.writeText(finalUrl);
       setCopiedSingleGoalLink(true);
       setTimeout(() => setCopiedSingleGoalLink(false), 3000);
     } catch {
@@ -168,6 +219,117 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
     }
 
     setSavedGoalBanner(true);
+  };
+
+  // Live-edit goal from main input WITHOUT changing the currently generated OBS link
+  const handleLiveEditActiveGoalOnly = async () => {
+    const cleanNum = Number(goalTextInput.replace(/[^0-9]/g, ''));
+    const nextGoal =
+      Number.isFinite(cleanNum) && cleanNum > 0
+        ? Math.round(cleanNum)
+        : settings.followerGoal;
+
+    const nextTitle =
+      goalTitleInput.trim() &&
+      !goalTitleInput.trim().startsWith('ROAD TO ')
+        ? goalTitleInput.trim()
+        : `ROAD TO ${nextGoal.toLocaleString()} FOLLOWERS`;
+    setGoalTitleInput(nextTitle);
+
+    if (activeGoalLinkId) {
+      await handleLiveUpdateHistoryItem(activeGoalLinkId, nextGoal, nextTitle);
+    } else {
+      await onAdjustCounter({
+        exactGoal: nextGoal,
+        goalTitle: nextTitle,
+      });
+    }
+    setSavedGoalBanner(true);
+  };
+
+  const handleLiveUpdateHistoryItem = async (
+    id: string,
+    overrideGoal?: number,
+    overrideTitle?: string
+  ) => {
+    const existing = (settings.goalLinkHistory || []).find((i) => i.id === id);
+    if (!existing) return;
+
+    const draftGoalNum =
+      typeof overrideGoal === 'number'
+        ? overrideGoal
+        : Number((historyGoalDrafts[id] ?? String(existing.goal)).replace(/[^0-9]/g, ''));
+    const nextGoal =
+      Number.isFinite(draftGoalNum) && draftGoalNum > 0
+        ? Math.round(draftGoalNum)
+        : existing.goal;
+    const rawDraftTitle =
+      typeof overrideTitle === 'string'
+        ? overrideTitle
+        : historyTitleDrafts[id] ?? existing.goalTitle;
+    const nextTitle =
+      rawDraftTitle.trim() && !rawDraftTitle.trim().startsWith('ROAD TO ')
+        ? rawDraftTitle.trim()
+        : `ROAD TO ${nextGoal.toLocaleString()} FOLLOWERS`;
+
+    const metaDraft = historyMetaDrafts[id] || {};
+    const nextLabel =
+      typeof metaDraft.label === 'string' && metaDraft.label.trim()
+        ? metaDraft.label.trim()
+        : existing.label;
+    const nextTemplate = metaDraft.template || existing.template;
+    const nextFont = metaDraft.font || existing.font;
+    const nextShowGoal =
+      typeof metaDraft.showGoal === 'boolean'
+        ? metaDraft.showGoal
+        : existing.showGoal;
+
+    try {
+      const res = await fetch(`/api/goal-links/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: nextLabel,
+          goal: nextGoal,
+          goalTitle: nextTitle,
+          template: nextTemplate,
+          font: nextFont,
+          showGoal: nextShowGoal,
+          syncMain: true,
+        }),
+      });
+      const json = (await res.json()) as { settings?: AppSettings };
+      if (json?.settings) {
+        await onUpdateSettings({
+          followerGoal: json.settings.followerGoal,
+          goalTitle: json.settings.goalTitle,
+          activeCounterTemplate: json.settings.activeCounterTemplate,
+          counterFont: json.settings.counterFont,
+          goalLinkHistory: json.settings.goalLinkHistory,
+        });
+      }
+      setSavedHistoryId(id);
+      setTimeout(() => setSavedHistoryId((curr) => (curr === id ? null : curr)), 3500);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleDeleteHistoryItem = async (id: string) => {
+    try {
+      const res = await fetch(`/api/goal-links/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      const json = (await res.json()) as { settings?: AppSettings };
+      if (json?.settings) {
+        await onUpdateSettings({ goalLinkHistory: json.settings.goalLinkHistory });
+        if (activeGoalLinkId === id) {
+          setActiveGoalLinkId(json.settings.goalLinkHistory?.[0]?.id || null);
+        }
+      }
+    } catch {
+      // ignore
+    }
   };
 
   const handleSelectTemplateAndPromptGoal = async (
@@ -367,7 +529,7 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      handleApplyGoalAndGenerateLink();
+                      handleLiveEditActiveGoalOnly();
                     }
                   }}
                   placeholder="Enter goal (e.g. 1500)..."
@@ -375,10 +537,11 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
                 />
                 <button
                   type="button"
-                  onClick={() => handleApplyGoalAndGenerateLink()}
+                  data-testid="live-apply-goal-no-link-change-btn"
+                  onClick={handleLiveEditActiveGoalOnly}
                   className="px-3 py-2 rounded-lg bg-[#53FC18] hover:bg-[#45d912] text-slate-950 font-bold text-xs cursor-pointer shrink-0"
                 >
-                  Apply Goal
+                  Apply Live
                 </button>
               </div>
 
@@ -388,7 +551,17 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
                   <button
                     key={preset}
                     type="button"
-                    onClick={() => handleApplyGoalAndGenerateLink(preset)}
+                    onClick={() => {
+                      setGoalTextInput(String(preset));
+                      const nextTitle = `ROAD TO ${preset.toLocaleString()} FOLLOWERS`;
+                      setGoalTitleInput(nextTitle);
+                      if (activeGoalLinkId) {
+                        handleLiveUpdateHistoryItem(activeGoalLinkId, preset, nextTitle);
+                      } else {
+                        onAdjustCounter({ exactGoal: preset, goalTitle: nextTitle });
+                      }
+                      setSavedGoalBanner(true);
+                    }}
                     className={`px-2 py-0.5 rounded font-mono text-[11px] border transition-colors cursor-pointer ${
                       effectiveGoal === preset
                         ? 'bg-[#53FC18]/20 border-[#53FC18] text-[#53FC18] font-bold'
@@ -518,6 +691,272 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
           }
         />
       </div>
+
+      {/* Saved Follower Goal Link History (Live Edit Goal Without Changing Your OBS Link!) */}
+      <section
+        data-testid="goal-link-history-section"
+        className="rounded-xl bg-[#0D131C] border border-[#53FC18]/40 p-6 space-y-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-2.5">
+            <History className="w-5 h-5 text-[#53FC18]" />
+            <div>
+              <h2 className="text-lg font-bold text-white">
+                Saved Follower Goal Link History (Edit Goal Live Without Changing OBS Link)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Every Follower Goal link you generate is saved here automatically. Edit its Goal Target anytime below and your OBS Browser Source updates live instantly — zero need to replace the URL in OBS!
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-mono text-[#53FC18] bg-[#53FC18]/10 border border-[#53FC18]/40 px-2.5 py-1 rounded">
+            {(settings.goalLinkHistory || []).length} Saved Link(s)
+          </span>
+        </div>
+
+        {(settings.goalLinkHistory || []).length === 0 ? (
+          <div className="rounded-lg bg-[#080C12] border border-slate-800 p-5 text-center space-y-2">
+            <p className="text-xs text-slate-400">
+              No saved Follower Goal links yet. Click <strong className="text-[#53FC18]">“Apply Follower Goal &amp; Generate Single OBS Link”</strong> above to create and save your first live-editable OBS goal link!
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {(settings.goalLinkHistory || []).map((item) => {
+              const draftGoal = historyGoalDrafts[item.id] ?? String(item.goal);
+              const draftTitle = historyTitleDrafts[item.id] ?? item.goalTitle;
+              const isJustSaved = savedHistoryId === item.id;
+              const isCopied = copiedHistoryId === item.id;
+              const isActive = activeGoalLinkId === item.id;
+
+              return (
+                <div
+                  key={item.id}
+                  data-testid={`goal-history-item-${item.id}`}
+                  className={`rounded-xl p-4 border transition-all space-y-3 ${
+                    isActive
+                      ? 'bg-[#080F0B] border-[#53FC18]/60'
+                      : 'bg-[#070B11] border-slate-800'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-bold text-white">{item.label}</span>
+                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 font-mono text-[11px] text-[#53FC18]">
+                        Current Live Goal: {item.goal.toLocaleString()}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 font-mono text-[11px] text-slate-300">
+                        {item.template} · {item.font}
+                      </span>
+                      {isJustSaved && (
+                        <span className="px-2 py-0.5 rounded bg-[#53FC18]/20 border border-[#53FC18] font-mono text-[11px] font-bold text-[#53FC18]">
+                          ✓ Updated Live! Same OBS Link Auto-Synced!
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteHistoryItem(item.id)}
+                      aria-label={`Delete saved goal link ${item.label}`}
+                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-rose-400 hover:bg-rose-500/15 border border-transparent hover:border-rose-500/40 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Remove</span>
+                    </button>
+                  </div>
+
+                  {/* Permanent Link Row */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      aria-label={`Saved OBS URL for ${item.label}`}
+                      value={item.url}
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                      className="flex-1 rounded-lg bg-[#04070B] border border-slate-800 px-3 py-2 text-xs font-mono text-[#53FC18] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(item.url);
+                        } catch {
+                          // ignore
+                        }
+                        setCopiedHistoryId(item.id);
+                        setActiveGoalLinkId(item.id);
+                        setTimeout(() => setCopiedHistoryId(null), 2200);
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#53FC18] hover:bg-[#45d912] text-slate-950 font-bold text-xs px-3.5 py-2 whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{isCopied ? 'Copied!' : 'Copy Permanent Link'}</span>
+                    </button>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs px-3 py-2 border border-slate-700 whitespace-nowrap shrink-0"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      <span>Open</span>
+                    </a>
+                  </div>
+
+                  {/* Live Edit Goal Row (Updates OBS Without Changing URL!) */}
+                  <div className="rounded-lg bg-[#05080D] border border-slate-800/90 p-3 space-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+                      <div className="sm:col-span-3">
+                        <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
+                          Edit Link Label
+                        </label>
+                        <input
+                          type="text"
+                          aria-label={`Edit Label for ${item.id}`}
+                          value={historyMetaDrafts[item.id]?.label ?? item.label}
+                          onChange={(e) =>
+                            setHistoryMetaDrafts((prev) => ({
+                              ...prev,
+                              [item.id]: { ...prev[item.id], label: e.target.value },
+                            }))
+                          }
+                          className="w-full rounded-lg bg-[#0A1017] border border-slate-700 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#53FC18]"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-3">
+                        <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
+                          Live Edit Follower Goal
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          aria-label={`Edit Follower Goal for ${item.id}`}
+                          value={draftGoal}
+                          onChange={(e) =>
+                            setHistoryGoalDrafts((prev) => ({
+                              ...prev,
+                              [item.id]: e.target.value,
+                            }))
+                          }
+                          className="w-full rounded-lg bg-[#0A1017] border border-slate-700 px-3 py-1.5 text-xs font-mono font-bold text-[#53FC18] focus:outline-none focus:border-[#53FC18]"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-6">
+                        <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
+                          Live Edit Goal Title
+                        </label>
+                        <input
+                          type="text"
+                          aria-label={`Edit Goal Title for ${item.id}`}
+                          value={draftTitle}
+                          onChange={(e) =>
+                            setHistoryTitleDrafts((prev) => ({
+                              ...prev,
+                              [item.id]: e.target.value,
+                            }))
+                          }
+                          className="w-full rounded-lg bg-[#0A1017] border border-slate-700 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#53FC18]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                      <div className="sm:col-span-4">
+                        <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
+                          Edit Template
+                        </label>
+                        <select
+                          aria-label={`Edit Template for ${item.id}`}
+                          value={historyMetaDrafts[item.id]?.template ?? item.template}
+                          onChange={(e) =>
+                            setHistoryMetaDrafts((prev) => ({
+                              ...prev,
+                              [item.id]: {
+                                ...prev[item.id],
+                                template: e.target.value as CounterTemplateId,
+                              },
+                            }))
+                          }
+                          className="w-full rounded-lg bg-[#0A1017] border border-slate-700 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#53FC18]"
+                        >
+                          {COUNTER_TEMPLATES.map((tpl) => (
+                            <option key={tpl.id} value={tpl.id}>
+                              {tpl.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-4">
+                        <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
+                          Edit Font
+                        </label>
+                        <select
+                          aria-label={`Edit Font for ${item.id}`}
+                          value={historyMetaDrafts[item.id]?.font ?? item.font}
+                          onChange={(e) =>
+                            setHistoryMetaDrafts((prev) => ({
+                              ...prev,
+                              [item.id]: {
+                                ...prev[item.id],
+                                font: e.target.value as FontFamilyName,
+                              },
+                            }))
+                          }
+                          className="w-full rounded-lg bg-[#0A1017] border border-slate-700 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#53FC18]"
+                        >
+                          {GOOGLE_FONTS.map((f) => (
+                            <option key={f.name} value={f.name}>
+                              {f.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setHistoryMetaDrafts((prev) => {
+                              const currentVal = prev[item.id]?.showGoal ?? item.showGoal;
+                              return {
+                                ...prev,
+                                [item.id]: { ...prev[item.id], showGoal: !currentVal },
+                              };
+                            })
+                          }
+                          className={`w-full rounded-lg px-2 py-1.5 text-[11px] font-mono font-bold border cursor-pointer ${
+                            (historyMetaDrafts[item.id]?.showGoal ?? item.showGoal)
+                              ? 'bg-[#53FC18]/15 border-[#53FC18] text-[#53FC18]'
+                              : 'bg-slate-900 border-slate-700 text-slate-400'
+                          }`}
+                        >
+                          {(historyMetaDrafts[item.id]?.showGoal ?? item.showGoal) ? 'BAR ON' : 'BAR OFF'}
+                        </button>
+                      </div>
+
+                      <div className="sm:col-span-3">
+                        <button
+                          type="button"
+                          data-testid={`save-live-history-goal-${item.id}`}
+                          onClick={() => handleLiveUpdateHistoryItem(item.id)}
+                          className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs px-3 py-2 transition-colors cursor-pointer"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Update Goal Live</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* 6 Ultra-Premium Follower Counter & Goal Templates Grid (Select Template -> Enter Goal -> Generate Link) */}
       <section className="space-y-4">

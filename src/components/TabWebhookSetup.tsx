@@ -27,6 +27,11 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
   onClearLogs,
 }) => {
   const [simUsername, setSimUsername] = useState('AaravSniper_IN');
+  const [simEventType, setSimEventType] = useState<
+    'channel.followed' | 'kicks.gifted' | 'channel.subscription.gifts'
+  >('channel.followed');
+  const [simAmount, setSimAmount] = useState(500);
+  const [simNote, setSimNote] = useState('');
   const [simStatus, setSimStatus] = useState<string>('');
   const [isSendingSim, setIsSendingSim] = useState(false);
   const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
@@ -107,36 +112,71 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
   const handleSendRealKickWebhookPost = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanUser = simUsername.trim() || 'KickVIP_Follower';
+    const cleanNote = simNote.trim();
     setIsSendingSim(true);
     setSimStatus('');
+
+    const payloadBody =
+      simEventType === 'kicks.gifted'
+        ? {
+            event: 'kicks.gifted',
+            channel: {
+              id: 948201,
+              slug: 'sujalxsaini',
+              url: 'https://kick.com/sujalxsaini',
+            },
+            sender: { username: cleanUser, is_anonymous: false },
+            gift: {
+              amount: Math.max(1, simAmount || 500),
+              name: 'Kicks',
+              ...(cleanNote ? { message: cleanNote } : {}),
+            },
+            created_at: new Date().toISOString(),
+          }
+        : simEventType === 'channel.subscription.gifts'
+          ? {
+              event: 'channel.subscription.gifts',
+              channel: {
+                id: 948201,
+                slug: 'sujalxsaini',
+                url: 'https://kick.com/sujalxsaini',
+              },
+              gifter: { username: cleanUser, is_anonymous: false },
+              quantity: Math.max(1, Math.min(100, simAmount || 5)),
+              ...(cleanNote ? { message: cleanNote } : {}),
+              created_at: new Date().toISOString(),
+            }
+          : {
+              event: 'channel.followed',
+              channel: {
+                id: 948201,
+                slug: 'sujalxsaini',
+                url: 'https://kick.com/sujalxsaini',
+              },
+              follower: {
+                username: cleanUser,
+                slug: cleanUser.toLowerCase().replace(/[^a-z0-9_]/g, ''),
+                verified: true,
+              },
+              created_at: new Date().toISOString(),
+            };
 
     try {
       const response = await fetch('/api/webhook/kick', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Kick-Event-Type': 'channel.followed',
+          'Kick-Event-Type': simEventType,
           'X-SujalX-Simulated': 'true',
         },
-        body: JSON.stringify({
-          event: 'channel.followed',
-          channel: {
-            id: 948201,
-            slug: 'sujalxsaini',
-            url: 'https://kick.com/sujalxsaini',
-          },
-          follower: {
-            username: cleanUser,
-            slug: cleanUser.toLowerCase().replace(/[^a-z0-9_]/g, ''),
-            verified: true,
-          },
-          created_at: new Date().toISOString(),
-        }),
+        body: JSON.stringify(payloadBody),
       });
       const data = await response.json();
       if (response.ok && data.received) {
         setSimStatus(
-          `200 OK — Webhook processed for "${cleanUser}"! New Follower Count: ${data.followerCount}`
+          simEventType === 'channel.followed'
+            ? `200 OK — Follow webhook processed for "${cleanUser}"! Follower Count: ${data.followerCount}`
+            : `200 OK — ${simEventType} webhook processed for "${cleanUser}" (${data.amount})${cleanNote ? ` + note "${cleanNote}"` : ''}!`
         );
       } else {
         setSimStatus('Webhook returned an unexpected status.');
@@ -352,21 +392,54 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
             </div>
 
             <form onSubmit={handleSendRealKickWebhookPost} className="space-y-3">
-              <label
-                htmlFor="sim-webhook-username"
-                className="block text-xs font-medium text-slate-300"
-              >
-                Simulated New Follower Username (Triggers POST /api/webhook/kick + OBS Alert + +1 Count)
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label
+                  htmlFor="sim-webhook-username"
+                  className="block text-xs font-medium text-slate-300"
+                >
+                  Simulated Kick Webhook Event (Follow / Kicks Gift / Subs Gift)
+                </label>
+                <select
+                  aria-label="Simulated Webhook Event Type"
+                  value={simEventType}
+                  onChange={(e) => {
+                    const nextType = e.target.value as
+                      | 'channel.followed'
+                      | 'kicks.gifted'
+                      | 'channel.subscription.gifts';
+                    setSimEventType(nextType);
+                    if (nextType === 'kicks.gifted') setSimAmount(500);
+                    else if (nextType === 'channel.subscription.gifts') setSimAmount(5);
+                  }}
+                  className="rounded-lg bg-[#070A0F] border border-slate-700 px-2.5 py-1.5 text-xs font-mono text-[#53FC18] focus:outline-none focus:border-[#53FC18]"
+                >
+                  <option value="channel.followed">channel.followed</option>
+                  <option value="kicks.gifted">kicks.gifted</option>
+                  <option value="channel.subscription.gifts">channel.subscription.gifts</option>
+                </select>
+              </div>
               <div className="flex flex-col sm:flex-row gap-2.5">
                 <input
                   id="sim-webhook-username"
                   type="text"
                   value={simUsername}
                   onChange={(e) => setSimUsername(e.target.value)}
-                  placeholder="Enter follower username"
+                  placeholder="Enter username..."
                   className="flex-1 rounded-lg bg-[#070A0F] border border-slate-700 px-3.5 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-[#53FC18]"
                 />
+                {simEventType !== 'channel.followed' && (
+                  <input
+                    type="number"
+                    aria-label="Simulated Gift Amount"
+                    min={1}
+                    max={100000}
+                    value={simAmount}
+                    onChange={(e) =>
+                      setSimAmount(Math.max(1, Number(e.target.value) || 1))
+                    }
+                    className="w-24 rounded-lg bg-[#070A0F] border border-slate-700 px-3 py-2.5 text-xs font-mono text-amber-300 focus:outline-none focus:border-[#53FC18]"
+                  />
+                )}
                 <button
                   type="submit"
                   disabled={isSendingSim}
@@ -376,10 +449,20 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
                   <span>
                     {isSendingSim
                       ? 'Sending Webhook...'
-                      : 'Send Simulated Kick Webhook (channel.followed)'}
+                      : `Send Simulated Webhook (${simEventType})`}
                   </span>
                 </button>
               </div>
+              {simEventType !== 'channel.followed' && (
+                <input
+                  type="text"
+                  aria-label="Simulated Gift Note"
+                  value={simNote}
+                  onChange={(e) => setSimNote(e.target.value)}
+                  placeholder="Optional gift note (emojis supported 🔥 — leave blank to read gift amount only)..."
+                  className="w-full rounded-lg bg-[#070A0F] border border-slate-700 px-3.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-[#53FC18]"
+                />
+              )}
               {simStatus && (
                 <div
                   role="status"
@@ -469,7 +552,15 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
                       <span className="text-slate-500">·</span>
                       <span className="font-semibold">
                         <span className="text-[#53FC18] font-bold">{log.username}</span>{' '}
-                        <span className="text-white">started following</span>
+                        <span className="text-white">
+                          {log.eventType.toLowerCase().includes('kicks')
+                            ? 'sent kicks'
+                            : log.eventType.toLowerCase().includes('subscription.gifts')
+                              ? 'gifted subs'
+                              : log.eventType.toLowerCase().includes('subscription')
+                                ? 'subscribed'
+                                : 'started following'}
+                        </span>
                       </span>
                     </div>
                     <div className="flex items-center gap-3 text-xs font-mono text-slate-400 tabular-nums">

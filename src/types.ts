@@ -1,5 +1,8 @@
 export type AlertTemplateId = 'neon' | 'gold' | 'esports' | 'glass' | 'anime' | 'holo';
 export type CounterTemplateId = 'neon' | 'gold' | 'esports' | 'glass' | 'matrix' | 'holo';
+export type AlertEventType = 'follow' | 'kicks' | 'sub-gift' | 'sub-buy';
+export type TextAlertStyle = 'kinetic-neon' | 'cyber-drop' | 'gold-impact' | 'glitch-pulse';
+export type TextAlertEventFilter = 'all' | 'kicks' | 'sub-gift' | 'sub-buy';
 
 export type FontFamilyName =
   | 'Orbitron'
@@ -13,7 +16,20 @@ export type FontFamilyName =
 
 export type SfxPresetId = 'cyber' | 'royal' | 'valorant' | 'anime' | 'glass' | 'arcade';
 
-export type TtsLangCode = 'en-IN' | 'hi-IN' | 'en-US' | 'en-GB' | 'ja-JP' | 'es-ES';
+export type TtsLangCode =
+  | 'pro-hype-male'
+  | 'pro-caster-female'
+  | 'pro-vip-narrator'
+  | 'pro-uk-gent'
+  | 'pro-emotional-female'
+  | 'pro-funny-male'
+  | 'pro-aussie-chill'
+  | 'en-IN'
+  | 'hi-IN'
+  | 'en-US'
+  | 'en-GB'
+  | 'ja-JP'
+  | 'es-ES';
 
 export interface TtsSettings {
   enabled: boolean;
@@ -30,6 +46,9 @@ export interface RecentFollower {
   username: string;
   timestamp: string;
   source: 'kick-webhook' | 'simulator' | 'test' | 'replay';
+  eventType?: AlertEventType;
+  amount?: number;
+  subMessage?: string;
   avatarColor?: string;
   avatarUrl?: string;
 }
@@ -64,6 +83,36 @@ export interface ObsClientCounts {
   dashboard: number;
 }
 
+export interface GoalLinkHistoryItem {
+  id: string;
+  label: string;
+  url: string;
+  goal: number;
+  goalTitle: string;
+  template: CounterTemplateId;
+  font: FontFamilyName;
+  showGoal: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TextAlertLinkHistoryItem {
+  id: string;
+  label: string;
+  url: string;
+  eventFilter: TextAlertEventFilter;
+  style: TextAlertStyle;
+  font: FontFamilyName;
+  sfxPreset?: SfxPresetId;
+  duration: number;
+  ttsEnabled: boolean;
+  voice: TtsLangCode;
+  rate: number;
+  volume: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppSettings {
   channelName: string;
   channelUrl: string;
@@ -78,6 +127,10 @@ export interface AppSettings {
   activeCounterTemplate: CounterTemplateId;
   selectedFont: FontFamilyName;
   counterFont: FontFamilyName;
+  textAlertFont?: FontFamilyName;
+  textAlertStyle?: TextAlertStyle;
+  textAlertDuration?: number;
+  textAlertSfxPreset?: SfxPresetId;
   alertDuration: number;
   sfxPreset: SfxPresetId;
   customSfxUrl: string;
@@ -85,11 +138,17 @@ export interface AppSettings {
   ttsSettings: TtsSettings;
   recentFollowers: RecentFollower[];
   webhookLogs: WebhookLogEntry[];
+  goalLinkHistory?: GoalLinkHistoryItem[];
+  textAlertLinkHistory?: TextAlertLinkHistoryItem[];
   setupChecklist: SetupChecklist;
 }
 
 export interface FollowAlertPayload {
   id: string;
+  eventType?: AlertEventType;
+  amount?: number;
+  subMessage?: string;
+  textStyle?: TextAlertStyle;
   username: string;
   avatarUrl?: string;
   timestamp: string;

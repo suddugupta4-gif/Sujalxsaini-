@@ -1,41 +1,54 @@
 import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import {
+  BellRing,
   Flame,
+  MonitorPlay,
   PartyPopper,
   Pause,
   Play,
   SkipForward,
+  Sparkles,
+  Target,
   Volume2,
   VolumeX,
   Lock,
   ExternalLink,
+  Webhook,
+  Zap,
 } from 'lucide-react';
 import type {
+  AlertEventType,
   AppSettings,
   FollowAlertPayload,
   ObsClientCounts,
   WebhookLogEntry,
 } from './types';
-import { parseObsQueryOverrides, formatTtsMessage } from './utils/logic';
+import {
+  formatEventTtsText,
+  parseObsQueryOverrides,
+} from './utils/logic';
 import {
   playSynthesizedSfx,
   playMilestoneFanfare,
-  speakAlertTts,
+  prepareTtsAudio,
   stopActiveSpeech,
 } from './utils/soundEngine';
 import { ObsAlertsOverlay } from './components/ObsAlertsOverlay';
 import { ObsCounterOverlay } from './components/ObsCounterOverlay';
 import { PinLockScreen } from './components/PinLockScreen';
 import { TabAlertStudio } from './components/TabAlertStudio';
+import { TabKicksSubsStudio } from './components/TabKicksSubsStudio';
 import { TabCounterStudio } from './components/TabCounterStudio';
 import { TabWebhookSetup } from './components/TabWebhookSetup';
 import { TabObsSetupGuide } from './components/TabObsSetupGuide';
 import { TabVipToolsFeed } from './components/TabVipToolsFeed';
 import { AlertCardRenderer } from './components/AlertCardTemplates';
+import { TextOnlyAlert } from './components/TextOnlyAlert';
 
 type DashboardTabId =
   | 'alerts'
+  | 'kicks-subs'
   | 'counter'
   | 'webhook'
   | 'obs-guide'
@@ -55,13 +68,17 @@ const FALLBACK_SETTINGS: AppSettings = {
   activeCounterTemplate: 'neon',
   selectedFont: 'Orbitron',
   counterFont: 'Orbitron',
+  textAlertFont: 'Bebas Neue',
+  textAlertStyle: 'kinetic-neon',
+  textAlertDuration: 6,
+  textAlertSfxPreset: 'royal',
   alertDuration: 7,
   sfxPreset: 'cyber',
   customSfxUrl: '',
   ttsSettings: {
     enabled: true,
     mode: 'stream',
-    lang: 'en-US',
+    lang: 'pro-hype-male',
     messageTemplate: '{username} started following',
     rate: 1.0,
     pitch: 1.0,
@@ -69,6 +86,8 @@ const FALLBACK_SETTINGS: AppSettings = {
   },
   recentFollowers: [],
   webhookLogs: [],
+  goalLinkHistory: [],
+  textAlertLinkHistory: [],
   setupChecklist: {
     obsStep1LinksCopied: true,
     obsStep2SourceCreated: true,
@@ -91,6 +110,10 @@ export default function App() {
 
   if (queryInfo.obsMode === 'alerts') {
     return <ObsAlertsOverlay />;
+  }
+
+  if (queryInfo.obsMode === 'text-alerts') {
+    return <ObsAlertsOverlay textOnlyMode />;
   }
 
   if (queryInfo.obsMode === 'counter') {
@@ -256,22 +279,63 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
     }
   };
 
-  const handleFireTestAlert = async (customUsername?: string) => {
+  const handleFireTestAlert = async (
+    customUsername?: string,
+    eventOptions?: {
+      eventType?: AlertEventType;
+      amount?: number;
+      subMessage?: string;
+    }
+  ) => {
     const targetUsername =
       customUsername?.trim() || previewUsername.trim() || 'RohanGamingIN';
+    const eventType: AlertEventType = eventOptions?.eventType || 'follow';
+    const amount = eventOptions?.amount;
+    const subMessage = eventOptions?.subMessage;
+
     try {
+      const msgText = formatEventTtsText(
+        eventType,
+        targetUsername,
+        amount,
+        settings.ttsSettings.messageTemplate,
+        settings.channelName,
+        subMessage
+      );
+
+      // Pre-prepare TTS audio in parallel with /api/test-alert so local voice fires at 0ms
+      const ttsPreparePromise =
+        !settings.alertsMuted && settings.ttsSettings.enabled
+          ? prepareTtsAudio({
+              text: msgText,
+              lang: settings.ttsSettings.lang,
+              mode: settings.ttsSettings.mode,
+              rate: settings.ttsSettings.rate,
+              pitch: settings.ttsSettings.pitch,
+              volume: settings.ttsSettings.volume,
+              muted: settings.alertsMuted,
+            })
+          : Promise.resolve(null);
+
       const res = await fetch('/api/test-alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: targetUsername }),
+        body: JSON.stringify({
+          username: targetUsername,
+          eventType,
+          amount,
+          subMessage,
+        }),
       });
       const json = await res.json();
       if (json?.settings) {
         setSettings(json.settings);
       }
       const alertData = json?.alert as FollowAlertPayload | undefined;
+      const finalMsg = alertData?.ttsMessage || msgText;
+
       setBannerStatus(
-        `Fired Test Alert + TTS: "${targetUsername} started following" → sent to OBS!`
+        `Fired Exact-Time Alert + TTS: "${finalMsg}" → sent to OBS!`
       );
       setTimeout(() => setBannerStatus(''), 3500);
 
@@ -287,29 +351,17 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
       }
 
       if (!settings.alertsMuted) {
+        const sfxToUse =
+          eventType === 'follow'
+            ? settings.sfxPreset
+            : settings.textAlertSfxPreset || settings.sfxPreset || 'royal';
         await playSynthesizedSfx(
-          settings.sfxPreset,
+          sfxToUse,
           settings.customSfxUrl,
           settings.alertsMuted
-        );
-        if (settings.ttsSettings.enabled) {
-          const msg =
-            alertData?.ttsMessage ||
-            formatTtsMessage(
-              settings.ttsSettings.messageTemplate,
-              targetUsername,
-              settings.channelName
-            );
-          speakAlertTts({
-            text: msg,
-            lang: settings.ttsSettings.lang,
-            mode: settings.ttsSettings.mode,
-            rate: settings.ttsSettings.rate,
-            pitch: settings.ttsSettings.pitch,
-            volume: settings.ttsSettings.volume,
-            muted: settings.alertsMuted,
-          });
-        }
+        ).catch(() => {});
+        const prepared = await ttsPreparePromise;
+        prepared?.playNow();
       }
     } catch {
       // ignore
@@ -356,12 +408,20 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
     }
   };
 
-  const handleReplayAlert = async (username: string) => {
+  const handleReplayAlert = async (
+    username: string,
+    opts?: { eventType?: AlertEventType; amount?: number; subMessage?: string }
+  ) => {
     try {
       await fetch('/api/replay-alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({
+          username,
+          eventType: opts?.eventType,
+          amount: opts?.amount,
+          subMessage: opts?.subMessage,
+        }),
       });
       setBannerStatus(`Replayed VIP Alert + TTS for "${username}"!`);
       setTimeout(() => setBannerStatus(''), 3000);
@@ -379,114 +439,183 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
     );
   }
 
-  const navItems: { id: DashboardTabId; label: string }[] = [
-    { id: 'alerts', label: 'Alert Studio' },
-    { id: 'counter', label: 'Counters & Goals' },
-    { id: 'webhook', label: 'Kick Webhook Setup' },
-    { id: 'obs-guide', label: 'OBS Setup Guide' },
-    { id: 'vip-tools', label: 'VIP Tools & Feed' },
+  const navItems: {
+    id: DashboardTabId;
+    label: string;
+    badge?: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      id: 'alerts',
+      label: 'Alert Studio',
+      icon: <BellRing className="w-3.5 h-3.5" />,
+    },
+    {
+      id: 'kicks-subs',
+      label: 'Kicks & Subs',
+      badge: settings.textAlertLinkHistory?.length
+        ? String(settings.textAlertLinkHistory.length)
+        : undefined,
+      icon: <Zap className="w-3.5 h-3.5" />,
+    },
+    {
+      id: 'counter',
+      label: 'Follower Goal',
+      badge: settings.goalLinkHistory?.length
+        ? String(settings.goalLinkHistory.length)
+        : undefined,
+      icon: <Target className="w-3.5 h-3.5" />,
+    },
+    {
+      id: 'webhook',
+      label: 'Kick Webhooks',
+      icon: <Webhook className="w-3.5 h-3.5" />,
+    },
+    {
+      id: 'obs-guide',
+      label: 'OBS Guide',
+      icon: <MonitorPlay className="w-3.5 h-3.5" />,
+    },
+    {
+      id: 'vip-tools',
+      label: 'VIP Tools & Feed',
+      icon: <Sparkles className="w-3.5 h-3.5" />,
+    },
   ];
 
   return (
     <div className="min-h-screen bg-[#080B10] text-slate-100 flex flex-col">
-      {/* Top Bar Contract: 3 Zones (Brand Wordmark — 5 Single-Line Nav Links — 1 Primary Action) */}
-      <header className="flex flex-wrap items-center justify-between gap-8 px-6 py-4 border-b border-slate-800/90 bg-[#0B0F17]">
-        <a
-          href="/"
-          style={{ fontFamily: "'Orbitron', sans-serif" }}
-          className="text-lg font-extrabold tracking-wide text-[#53FC18] whitespace-nowrap shrink-0"
-        >
-          SujalX Kick Studio
-        </a>
-
-        <nav
-          aria-label="Primary Studio Navigation"
-          className="flex items-center gap-6 overflow-x-auto text-sm font-medium text-slate-300"
-        >
-          {navItems.map((item) => {
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveTab(item.id)}
-                className={`py-1 transition-colors whitespace-nowrap shrink-0 cursor-pointer border-b-2 ${
-                  isActive
-                    ? 'text-[#53FC18] border-[#53FC18] font-semibold'
-                    : 'text-slate-400 border-transparent hover:text-white'
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={() => handleFireTestAlert()}
-            className="px-4 py-2 text-xs font-bold text-slate-950 bg-[#53FC18] hover:bg-[#45d912] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Fire Test Alert + TTS
-          </button>
-        </div>
-      </header>
-
-      {/* Live Stream Deck Control Strip below Header */}
-      <div className="bg-[#0A0E15] border-b border-slate-800/80 px-6 py-3">
+      {/* Clean Top Brand & Live Channel Status Bar */}
+      <header className="px-6 py-3.5 border-b border-slate-800/90 bg-[#0B0F17]/95 backdrop-blur">
         <div className="max-w-[1380px] mx-auto flex flex-wrap items-center justify-between gap-4">
-          {/* Left: Channel Info & Real-Time OBS Connection Telemetry */}
-          <div className="flex flex-wrap items-center gap-4 text-xs">
+          <div className="flex flex-wrap items-center gap-3.5">
+            <a
+              href="/"
+              style={{ fontFamily: "'Orbitron', sans-serif" }}
+              className="text-lg font-extrabold tracking-wide text-[#53FC18] whitespace-nowrap shrink-0"
+            >
+              SujalX Kick Studio
+            </a>
+
             <a
               href="https://kick.com/sujalxsaini"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 font-mono font-bold text-white hover:text-[#53FC18] transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md bg-[#111824] border border-slate-800 px-2.5 py-1 text-xs font-mono font-semibold text-slate-200 hover:text-[#53FC18] hover:border-[#53FC18]/40 transition-colors"
             >
               <span>kick.com/sujalxsaini</span>
-              <ExternalLink className="w-3.5 h-3.5 text-[#53FC18]" />
+              <ExternalLink className="w-3 h-3 text-[#53FC18]" />
             </a>
-            <span className="text-slate-600">·</span>
-            <span className="font-mono tabular-nums text-slate-300">
-              Followers:{' '}
+
+            <div className="inline-flex items-center gap-1.5 rounded-md bg-[#0D1610] border border-[#53FC18]/30 px-2.5 py-1 text-xs font-mono tabular-nums text-slate-300">
+              <span>Followers:</span>
               <strong className="text-[#53FC18]">
                 {settings.followerCount.toLocaleString()}
-              </strong>{' '}
-              / {settings.followerGoal.toLocaleString()}
-            </span>
-            <span className="text-slate-600">·</span>
-            <span className="font-mono text-slate-300" data-testid="obs-alerts-status">
-              {obsCounts.alerts > 0
-                ? `🟢 OBS Alerts (${obsCounts.alerts} active)`
-                : '⚪ OBS Alerts (0 active)'}
-            </span>
-            <span className="text-slate-600">·</span>
-            <span className="font-mono text-slate-300" data-testid="obs-counter-status">
-              {obsCounts.counter > 0
-                ? `🟢 OBS Counter (${obsCounts.counter} active)`
-                : '⚪ OBS Counter (0 active)'}
-            </span>
+              </strong>
+              <span className="text-slate-500">/</span>
+              <span>{settings.followerGoal.toLocaleString()}</span>
+            </div>
           </div>
 
-          {/* Right: Stream Deck Quick Controls (Milestone, Pause, Skip, Mute, Lock) */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-md bg-[#101622] border border-slate-800 px-2.5 py-1 text-[11px] font-mono text-slate-300"
+              data-testid="obs-alerts-status"
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  obsCounts.alerts > 0 ? 'bg-[#53FC18]' : 'bg-slate-600'
+                }`}
+              />
+              <span>OBS Alerts ({obsCounts.alerts})</span>
+            </span>
+
+            <span
+              className="inline-flex items-center gap-1.5 rounded-md bg-[#101622] border border-slate-800 px-2.5 py-1 text-[11px] font-mono text-slate-300"
+              data-testid="obs-counter-status"
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  obsCounts.counter > 0 ? 'bg-[#53FC18]' : 'bg-slate-600'
+                }`}
+              />
+              <span>OBS Counter ({obsCounts.counter})</span>
+            </span>
+
             <button
               type="button"
               onClick={() => handleFireTestAlert()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#53FC18]/15 hover:bg-[#53FC18]/25 border border-[#53FC18]/50 text-[#53FC18] text-xs font-bold px-3 py-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-extrabold text-slate-950 bg-[#53FC18] hover:bg-[#45d912] rounded-lg shadow-[0_0_16px_rgba(83,252,24,0.22)] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Flame className="w-3.5 h-3.5" />
-              <span>Test Alert + TTS</span>
+              <span>Fire Test Alert + TTS</span>
             </button>
 
             <button
               type="button"
+              onClick={handleLock}
+              aria-label="Lock VIP Dashboard"
+              className="inline-flex items-center gap-1 rounded-lg bg-[#101622] hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs px-2.5 py-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Lock</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Dedicated All-Section Selection Buttons + Compact Stream Deck Controls */}
+      <div className="bg-[#090D14] border-b border-slate-800/80 px-6 py-3">
+        <div className="max-w-[1380px] mx-auto flex flex-wrap items-center justify-between gap-3">
+          {/* Clear Interactive Buttons for All Sections */}
+          <nav
+            aria-label="All Section Selection"
+            data-testid="section-selector-bar"
+            className="flex flex-wrap items-center gap-2"
+          >
+            {navItems.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  data-testid={`nav-btn-${item.id}`}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold border transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                    isActive
+                      ? item.id === 'kicks-subs'
+                        ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-[0_0_18px_rgba(251,191,36,0.28)]'
+                        : 'bg-[#53FC18] text-slate-950 border-[#53FC18] shadow-[0_0_18px_rgba(83,252,24,0.28)]'
+                      : 'bg-[#101622] border-slate-800 text-slate-300 hover:border-slate-600 hover:text-white hover:bg-[#151D2C]'
+                  }`}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                  {item.badge && (
+                    <span
+                      className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                        isActive
+                          ? 'bg-slate-950/20 text-slate-950'
+                          : 'bg-slate-800 text-[#53FC18]'
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Compact Stream Deck Controls */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
               onClick={handleTriggerMilestone}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400/15 hover:bg-amber-400/25 border border-amber-400/40 text-amber-300 text-xs font-bold px-3 py-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400/12 hover:bg-amber-400/20 border border-amber-400/35 text-amber-300 text-xs font-bold px-3 py-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <PartyPopper className="w-3.5 h-3.5" />
-              <span>Trigger Milestone Confetti</span>
+              <span>Milestone</span>
             </button>
 
             <button
@@ -495,7 +624,7 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
               className={`inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold px-3 py-1.5 border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 settings.alertsPaused
                   ? 'bg-amber-500/20 border-amber-400 text-amber-300'
-                  : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200'
+                  : 'bg-[#101622] hover:bg-slate-800 border-slate-800 text-slate-300'
               }`}
             >
               {settings.alertsPaused ? (
@@ -503,16 +632,16 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
               ) : (
                 <Pause className="w-3.5 h-3.5" />
               )}
-              <span>{settings.alertsPaused ? 'Resume Queue' : 'Pause Queue'}</span>
+              <span>{settings.alertsPaused ? 'Resume' : 'Pause'}</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleQueueControl('skip')}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold px-3 py-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#101622] hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-semibold px-3 py-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <SkipForward className="w-3.5 h-3.5" />
-              <span>Skip Alert</span>
+              <span>Skip</span>
             </button>
 
             <button
@@ -521,7 +650,7 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
               className={`inline-flex items-center gap-1.5 rounded-lg text-xs font-semibold px-3 py-1.5 border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 settings.alertsMuted
                   ? 'bg-rose-500/20 border-rose-400 text-rose-300'
-                  : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200'
+                  : 'bg-[#101622] hover:bg-slate-800 border-slate-800 text-slate-300'
               }`}
             >
               {settings.alertsMuted ? (
@@ -529,17 +658,7 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
               ) : (
                 <Volume2 className="w-3.5 h-3.5" />
               )}
-              <span>{settings.alertsMuted ? 'Unmute Audio' : 'Mute Audio'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleLock}
-              aria-label="Lock VIP Dashboard"
-              className="inline-flex items-center gap-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white text-xs px-2.5 py-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Lock</span>
+              <span>{settings.alertsMuted ? 'Muted' : 'Audio On'}</span>
             </button>
           </div>
         </div>
@@ -574,15 +693,36 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
 
       {liveDashboardAlert && (
         <div className="fixed bottom-6 right-6 z-50 pointer-events-none max-w-md w-full px-4">
-          <AlertCardRenderer
-            template={liveDashboardAlert.template || settings.activeAlertTemplate}
-            font={liveDashboardAlert.font || settings.selectedFont}
-            username={liveDashboardAlert.username}
-            avatarUrl={liveDashboardAlert.avatarUrl || settings.customAvatarUrl}
-            ttsMessage={liveDashboardAlert.ttsMessage}
-            isSpeaking={true}
-            compact={true}
-          />
+          {liveDashboardAlert.eventType &&
+          liveDashboardAlert.eventType !== 'follow' ? (
+            <TextOnlyAlert
+              eventType={liveDashboardAlert.eventType}
+              username={liveDashboardAlert.username}
+              amount={liveDashboardAlert.amount}
+              subMessage={liveDashboardAlert.subMessage}
+              font={
+                liveDashboardAlert.font ||
+                settings.textAlertFont ||
+                'Bebas Neue'
+              }
+              stylePreset={
+                liveDashboardAlert.textStyle ||
+                settings.textAlertStyle ||
+                'kinetic-neon'
+              }
+              compact={true}
+            />
+          ) : (
+            <AlertCardRenderer
+              template={liveDashboardAlert.template || settings.activeAlertTemplate}
+              font={liveDashboardAlert.font || settings.selectedFont}
+              username={liveDashboardAlert.username}
+              avatarUrl={liveDashboardAlert.avatarUrl || settings.customAvatarUrl}
+              ttsMessage={liveDashboardAlert.ttsMessage}
+              isSpeaking={true}
+              compact={true}
+            />
+          )}
         </div>
       )}
 
@@ -590,6 +730,18 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
       <main className="flex-1 max-w-[1380px] w-full mx-auto px-6 py-8">
         {activeTab === 'alerts' && (
           <TabAlertStudio
+            settings={settings}
+            obsCounts={obsCounts}
+            previewUsername={previewUsername}
+            onPreviewUsernameChange={setPreviewUsername}
+            onUpdateSettings={handleUpdateSettings}
+            onFireTestAlert={handleFireTestAlert}
+            onOpenKicksSubsTab={() => setActiveTab('kicks-subs')}
+          />
+        )}
+
+        {activeTab === 'kicks-subs' && (
+          <TabKicksSubsStudio
             settings={settings}
             obsCounts={obsCounts}
             previewUsername={previewUsername}

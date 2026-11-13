@@ -7,7 +7,7 @@ import {
   Users,
   Send,
 } from 'lucide-react';
-import type { AppSettings, TtsLangCode } from '../types';
+import type { AlertEventType, AppSettings, TtsLangCode } from '../types';
 import {
   TTS_LANGUAGES,
   generateGamerAvatarDataUri,
@@ -17,7 +17,10 @@ import { speakAlertTts } from '../utils/soundEngine';
 
 interface TabVipToolsFeedProps {
   settings: AppSettings;
-  onReplayAlert: (username: string) => Promise<void>;
+  onReplayAlert: (
+    username: string,
+    opts?: { eventType?: AlertEventType; amount?: number; subMessage?: string }
+  ) => Promise<void>;
 }
 
 const QUICK_MEGAPHONE_LINES = [
@@ -236,9 +239,20 @@ export const TabVipToolsFeed: React.FC<TabVipToolsFeedProps> = ({
                       <div className="text-sm font-bold truncate">
                         <span className="text-[#53FC18]">{item.username}</span>{' '}
                         <span className="text-white font-semibold">
-                          started following
+                          {item.eventType === 'kicks'
+                            ? `sent ${item.amount || 100} kicks`
+                            : item.eventType === 'sub-gift'
+                              ? `gifted ${item.amount || 1} ${(item.amount || 1) === 1 ? 'sub' : 'subs'}`
+                              : item.eventType === 'sub-buy'
+                                ? 'subscribed'
+                                : 'started following'}
                         </span>
                       </div>
+                      {item.subMessage && (
+                        <div className="text-xs text-amber-300/90 truncate mt-0.5">
+                          &ldquo;{item.subMessage}&rdquo;
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 text-xs text-slate-400 font-mono tabular-nums mt-0.5">
                         <span>{item.source}</span>
                         <span>·</span>
@@ -253,7 +267,11 @@ export const TabVipToolsFeed: React.FC<TabVipToolsFeedProps> = ({
                     type="button"
                     onClick={async () => {
                       setReplayingId(item.id);
-                      await onReplayAlert(item.username);
+                      await onReplayAlert(item.username, {
+                        eventType: item.eventType,
+                        amount: item.amount,
+                        subMessage: item.subMessage,
+                      });
                       setTimeout(() => setReplayingId(null), 1200);
                     }}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[#53FC18] text-xs font-semibold px-3.5 py-2 border border-slate-700 transition-colors whitespace-nowrap shrink-0 cursor-pointer"

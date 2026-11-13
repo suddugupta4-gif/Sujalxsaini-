@@ -1,9 +1,12 @@
 import type {
+  AlertEventType,
   AlertTemplateId,
   AppSettings,
   CounterTemplateId,
   FontFamilyName,
   SfxPresetId,
+  TextAlertEventFilter,
+  TextAlertStyle,
   TtsLangCode,
 } from '../types';
 
@@ -28,10 +31,17 @@ export const TTS_LANGUAGES: {
   region: string;
   sample: string;
 }[] = [
+  { code: 'pro-hype-male', label: 'Pro Hype Male (Deep Streamer)', region: 'Neural Studio', sample: 'KaranClutchX just sent 500 kicks! Let us go!' },
+  { code: 'pro-caster-female', label: 'Pro Female Caster (Crisp Clear)', region: 'Neural Studio', sample: 'RohanGamingIN gifted 5 subs to the squad!' },
+  { code: 'pro-vip-narrator', label: 'VIP Movie Narrator (Epic Boss)', region: 'Neural Studio', sample: 'A new champion enters the sujalxsaini arena!' },
+  { code: 'pro-emotional-female', label: 'Expressive Female (Warm Neural)', region: 'Neural Studio', sample: 'Thank you so much for supporting sujalxsaini!' },
+  { code: 'pro-funny-male', label: 'Overdrive Hype Bro (Energetic)', region: 'Neural Studio', sample: 'Massive kicks drop on the Kick stream right now!' },
+  { code: 'pro-uk-gent', label: 'British Pro Broadcaster (Royal UK)', region: 'UK Studio', sample: 'Cheers for the 500 kicks on sujalxsaini!' },
+  { code: 'pro-aussie-chill', label: 'Aussie Clean Caster (Smooth)', region: 'AU Studio', sample: 'Absolute legend dropping kicks in chat!' },
   { code: 'en-IN', label: 'Indian English (VIP Accent)', region: 'India', sample: 'Namaste and welcome to sujalxsaini VIP stream!' },
   { code: 'hi-IN', label: 'Hindi (हिन्दी Voice)', region: 'India', sample: 'सुजल भाई के स्ट्रीम में आपका स्वागत है!' },
-  { code: 'en-US', label: 'US English (Broadcast)', region: 'United States', sample: 'Welcome to the sujalxsaini squad on Kick!' },
-  { code: 'en-GB', label: 'British English (Royal)', region: 'United Kingdom', sample: 'Cheers for following sujalxsaini, mate!' },
+  { code: 'en-US', label: 'US English (Studio Neural)', region: 'United States', sample: 'Welcome to the sujalxsaini squad on Kick!' },
+  { code: 'en-GB', label: 'British English (Classic UK)', region: 'United Kingdom', sample: 'Cheers for following sujalxsaini, mate!' },
   { code: 'ja-JP', label: 'Japanese (Anime Voice)', region: 'Japan', sample: 'Sujalxsaini check in! Arigato gozaimasu!' },
   { code: 'es-ES', label: 'Spanish (Hype Caster)', region: 'Spain', sample: '¡Bienvenido al canal oficial de sujalxsaini!' },
 ];
@@ -203,16 +213,230 @@ export function computeAdaptiveUsernameFontSize(
   return Math.max(minSize, Math.round(baseMax * (14 / len)));
 }
 
+const EMOJI_WORD_MAP: Record<string, string> = {
+  '❤️': 'heart',
+  '❤': 'heart',
+  '♥️': 'heart',
+  '♥': 'heart',
+  '💖': 'sparkling heart',
+  '💗': 'growing heart',
+  '💓': 'beating heart',
+  '💞': 'hearts',
+  '💕': 'two hearts',
+  '💘': 'heart arrow',
+  '💝': 'gift heart',
+  '🧡': 'orange heart',
+  '💛': 'yellow heart',
+  '💚': 'green heart',
+  '💙': 'blue heart',
+  '💜': 'purple heart',
+  '🖤': 'black heart',
+  '🤍': 'white heart',
+  '🤎': 'brown heart',
+  '💔': 'broken heart',
+  '🫶': 'heart hands',
+  '🔥': 'fire',
+  '💯': 'one hundred',
+  '⚡': 'lightning',
+  '💥': 'boom',
+  '✨': 'sparkles',
+  '🌟': 'glowing star',
+  '⭐': 'star',
+  '👑': 'crown',
+  '🏆': 'trophy',
+  '🥇': 'first place',
+  '🥈': 'second place',
+  '🥉': 'third place',
+  '🎮': 'gaming',
+  '🕹️': 'joystick',
+  '🕹': 'joystick',
+  '🎯': 'bullseye',
+  '🚀': 'rocket',
+  '💎': 'diamond',
+  '💰': 'money bag',
+  '💵': 'dollar',
+  '💸': 'money wings',
+  '🪙': 'coin',
+  '🎁': 'gift',
+  '🎉': 'party',
+  '🎊': 'confetti',
+  '🎈': 'balloon',
+  '🥳': 'party face',
+  '😂': 'laughing',
+  '🤣': 'rofl',
+  '😭': 'crying',
+  '😢': 'sad',
+  '😊': 'smiling',
+  '😁': 'grinning',
+  '😄': 'happy',
+  '😃': 'happy',
+  '😀': 'happy',
+  '😉': 'wink',
+  '😎': 'cool',
+  '🤩': 'star struck',
+  '😍': 'heart eyes',
+  '🥰': 'loving',
+  '😘': 'kiss',
+  '🤯': 'mind blown',
+  '😱': 'shocked',
+  '😳': 'flushed',
+  '🥺': 'pleading',
+  '😡': 'angry',
+  '🤬': 'rage',
+  '💀': 'skull',
+  '☠️': 'skull',
+  '☠': 'skull',
+  '👻': 'ghost',
+  '🤡': 'clown',
+  '💩': 'poop',
+  '🫡': 'salute',
+  '🤫': 'shush',
+  '🤔': 'thinking',
+  '😏': 'smirk',
+  '🙄': 'eye roll',
+  '😴': 'sleeping',
+  '🤮': 'puke',
+  '🤢': 'sick',
+  '🥶': 'cold',
+  '🥵': 'hot',
+  '😈': 'devil',
+  '👿': 'angry devil',
+  '😇': 'angel',
+  '👍': 'thumbs up',
+  '👎': 'thumbs down',
+  '👏': 'clap',
+  '🙌': 'cheers',
+  '🙏': 'namaste',
+  '🤝': 'handshake',
+  '✌️': 'peace',
+  '✌': 'peace',
+  '🤞': 'fingers crossed',
+  '🤟': 'rock on',
+  '🤘': 'rock on',
+  '👌': 'okay',
+  '🤌': 'pinched fingers',
+  '💪': 'flex',
+  '👀': 'eyes',
+  '👆': 'up',
+  '👇': 'down',
+  '👉': 'right',
+  '👈': 'left',
+  '✋': 'high five',
+  '👋': 'wave',
+  '🐐': 'goat',
+  '🦁': 'lion',
+  '🐯': 'tiger',
+  '🐺': 'wolf',
+  '🦊': 'fox',
+  '🐻': 'bear',
+  '🐼': 'panda',
+  '🐸': 'frog',
+  '🐍': 'snake',
+  '🐉': 'dragon',
+  '🦅': 'eagle',
+  '🦈': 'shark',
+  '🍕': 'pizza',
+  '🍔': 'burger',
+  '☕': 'coffee',
+  '🍺': 'beer',
+  '🍻': 'cheers',
+  '🥂': 'cheers',
+  '🍾': 'champagne',
+  '🎵': 'music',
+  '🎶': 'music',
+  '🎤': 'mic',
+  '🎧': 'headphones',
+  '🔊': 'speaker',
+  '🔔': 'bell',
+  '⚠️': 'warning',
+  '⚠': 'warning',
+  '✅': 'check',
+  '❌': 'cross',
+  '❓': 'question',
+  '❗': 'exclamation',
+  '💤': 'sleep',
+  '🚩': 'red flag',
+  '🇮🇳': 'India',
+  '🇺🇸': 'USA',
+  '🇬🇧': 'UK',
+  '🇵🇰': 'Pakistan',
+  '🇧🇩': 'Bangladesh',
+  '🇳🇵': 'Nepal',
+  '0️⃣': 'zero',
+  '1️⃣': 'one',
+  '2️⃣': 'two',
+  '3️⃣': 'three',
+  '4️⃣': 'four',
+  '5️⃣': 'five',
+  '6️⃣': 'six',
+  '7️⃣': 'seven',
+  '8️⃣': 'eight',
+  '9️⃣': 'nine',
+  '🔟': 'ten',
+};
+
+const EMOJI_KEYS_SORTED = Object.keys(EMOJI_WORD_MAP).sort((a, b) => b.length - a.length);
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const EMOJI_REGEX = new RegExp(EMOJI_KEYS_SORTED.map(escapeRegex).join('|'), 'g');
+
+/**
+ * Converts emojis inside a message into natural spoken words so neural and
+ * multilingual TTS engines speak emojis clearly and never error on emoji-only notes.
+ */
+export function convertEmojisToSpokenText(rawText: string): string {
+  if (!rawText || typeof rawText !== 'string') return '';
+
+  // Strip skin-tone modifiers so base hand/face emojis always match cleanly
+  let normalized = rawText.replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '');
+
+  // Replace known emojis with spaced spoken words
+  let spoken = normalized.replace(EMOJI_REGEX, (match) => ` ${EMOJI_WORD_MAP[match] || ''} `);
+
+  // Strip any remaining unmapped pictographic emojis / variation selectors / ZWJ so TTS never errors
+  spoken = spoken
+    .replace(/[\uFE0E\uFE0F\u200D]/g, '')
+    .replace(/\p{Extended_Pictographic}/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Collapse spammy consecutive identical emoji words to at most 3 repetitions
+  const tokens = spoken.split(' ');
+  const deduped: string[] = [];
+  let runWord = '';
+  let runCount = 0;
+  const emojiWordValues = new Set(Object.values(EMOJI_WORD_MAP));
+  for (const token of tokens) {
+    const lower = token.toLowerCase();
+    if (emojiWordValues.has(lower) && lower === runWord) {
+      runCount++;
+      if (runCount <= 3) {
+        deduped.push(token);
+      }
+    } else {
+      runWord = token.toLowerCase();
+      runCount = 1;
+      deduped.push(token);
+    }
+  }
+
+  return deduped.join(' ').replace(/\s+([,.!?])/g, '$1').trim();
+}
+
 export function formatTtsMessage(template: string, username: string, channelName = 'sujalxsaini'): string {
-  const cleanUser = (username || 'KickUser').trim();
+  const cleanUser = convertEmojisToSpokenText(username || 'KickUser') || (username || 'KickUser').trim();
   const baseTemplate =
     template && template.trim().length > 0
       ? template
       : '{username} started following';
-  return baseTemplate
+  const raw = baseTemplate
     .replace(/\{username\}/gi, cleanUser)
     .replace(/\{user\}/gi, cleanUser)
     .replace(/\{channel\}/gi, channelName);
+  return convertEmojisToSpokenText(raw) || raw.trim();
 }
 
 export const PUBLIC_RENDER_ORIGIN = 'https://sujalx-kick-studio.onrender.com';
@@ -248,6 +472,334 @@ export function buildObsAlertUrl(
   return `${cleanOrigin}/?${searchParams.toString()}`;
 }
 
+export const TEXT_ALERT_STYLES: {
+  id: TextAlertStyle;
+  name: string;
+  description: string;
+  accentHex: string;
+}[] = [
+  {
+    id: 'kinetic-neon',
+    name: 'Kinetic Kick Neon',
+    description: 'Explosive #53FC18 slam + crisp neon outline drop shadow (zero box)',
+    accentHex: '#53FC18',
+  },
+  {
+    id: 'cyber-drop',
+    name: 'Cyber Ice Drop',
+    description: 'High-velocity cyan laser descent with glowing amount pop (zero box)',
+    accentHex: '#00F0FF',
+  },
+  {
+    id: 'gold-impact',
+    name: 'Royal Sovereign Gold',
+    description: 'Shimmering 24K liquid gold text sweep with luxury glow (zero box)',
+    accentHex: '#FFD700',
+  },
+  {
+    id: 'glitch-pulse',
+    name: 'Esports Glitch Pulse',
+    description: 'Chromatic RGB slice jitter + overdrive kinetic impact (zero box)',
+    accentHex: '#FF007A',
+  },
+];
+
+export interface ParsedKickEventDetails {
+  eventType: AlertEventType;
+  username: string;
+  amount?: number;
+  subMessage?: string;
+  avatarUrl?: string;
+}
+
+function pickFirstUsername(candidates: unknown[]): string {
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+    if (candidate && typeof candidate === 'object') {
+      const obj = candidate as Record<string, unknown>;
+      if (typeof obj.username === 'string' && obj.username.trim().length > 0) {
+        return obj.username.trim();
+      }
+      if (typeof obj.slug === 'string' && obj.slug.trim().length > 0) {
+        return obj.slug.trim();
+      }
+    }
+  }
+  return '';
+}
+
+function pickPositiveNumber(candidates: unknown[]): number | undefined {
+  for (const c of candidates) {
+    const num = typeof c === 'number' ? c : typeof c === 'string' ? Number(c) : NaN;
+    if (Number.isFinite(num) && num > 0) {
+      return Math.round(num);
+    }
+  }
+  return undefined;
+}
+
+function pickNoteString(candidates: unknown[]): string | undefined {
+  for (const candidate of candidates) {
+    let text = '';
+    if (typeof candidate === 'string') {
+      text = candidate.trim();
+    } else if (candidate && typeof candidate === 'object') {
+      const obj = candidate as Record<string, unknown>;
+      if (typeof obj.text === 'string') text = obj.text.trim();
+      else if (typeof obj.content === 'string') text = obj.content.trim();
+      else if (typeof obj.message === 'string') text = obj.message.trim();
+      else if (typeof obj.note === 'string') text = obj.note.trim();
+    }
+    if (
+      text.length > 0 &&
+      text.toLowerCase() !== 'null' &&
+      text.toLowerCase() !== 'undefined'
+    ) {
+      return text.slice(0, 140);
+    }
+  }
+  return undefined;
+}
+
+export function parseKickEventDetails(eventHeader: string, body: unknown): ParsedKickEventDetails {
+  const headerLower = (eventHeader || '').toLowerCase();
+  const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+  const nestedData =
+    record.data && typeof record.data === 'object'
+      ? (record.data as Record<string, unknown>)
+      : record;
+  const giftObj =
+    (record.gift && typeof record.gift === 'object'
+      ? (record.gift as Record<string, unknown>)
+      : nestedData.gift && typeof nestedData.gift === 'object'
+        ? (nestedData.gift as Record<string, unknown>)
+        : undefined);
+
+  let eventType: AlertEventType = 'follow';
+  if (
+    headerLower.includes('subscription.gifts') ||
+    headerLower.includes('giftedsubscriptions') ||
+    headerLower.includes('sub-gift') ||
+    headerLower.includes('sub_gift') ||
+    Array.isArray(record.giftees) ||
+    Array.isArray(nestedData.giftees)
+  ) {
+    eventType = 'sub-gift';
+  } else if (
+    headerLower.includes('kicks') ||
+    headerLower.includes('gift') ||
+    giftObj ||
+    record.kicks !== undefined ||
+    nestedData.kicks !== undefined
+  ) {
+    eventType = 'kicks';
+  } else if (
+    headerLower.includes('subscription.new') ||
+    headerLower.includes('subscription.renewal') ||
+    headerLower.includes('subscription') ||
+    headerLower.includes('sub-buy') ||
+    headerLower.includes('sub_buy')
+  ) {
+    eventType = 'sub-buy';
+  }
+
+  const senderObj =
+    (record.sender && typeof record.sender === 'object'
+      ? (record.sender as Record<string, unknown>)
+      : nestedData.sender && typeof nestedData.sender === 'object'
+        ? (nestedData.sender as Record<string, unknown>)
+        : undefined);
+  const gifterObj =
+    (record.gifter && typeof record.gifter === 'object'
+      ? (record.gifter as Record<string, unknown>)
+      : nestedData.gifter && typeof nestedData.gifter === 'object'
+        ? (nestedData.gifter as Record<string, unknown>)
+        : undefined);
+
+  const pickedName = pickFirstUsername([
+    eventType === 'kicks' ? record.sender : undefined,
+    eventType === 'kicks' ? nestedData.sender : undefined,
+    eventType === 'sub-gift' ? record.gifter : undefined,
+    eventType === 'sub-gift' ? nestedData.gifter : undefined,
+    eventType === 'sub-buy' ? record.subscriber : undefined,
+    eventType === 'sub-buy' ? nestedData.subscriber : undefined,
+    record.follower,
+    nestedData.follower,
+    record.sender,
+    record.gifter,
+    record.subscriber,
+    record.user,
+    nestedData.user,
+    record.username,
+    nestedData.username,
+  ]);
+  const isAnon = Boolean(senderObj?.is_anonymous || gifterObj?.is_anonymous);
+  const username = pickedName || (isAnon ? 'Anonymous' : extractFollowerUsername(body));
+
+  let amount: number | undefined;
+  if (eventType === 'kicks') {
+    amount =
+      pickPositiveNumber([
+        giftObj?.amount,
+        giftObj?.gift_amount,
+        giftObj?.value,
+        giftObj?.quantity,
+        record.amount,
+        nestedData.amount,
+        record.kicks,
+        nestedData.kicks,
+        record.gift_amount,
+        nestedData.gift_amount,
+        record.quantity,
+        nestedData.quantity,
+      ]) || 100;
+  } else if (eventType === 'sub-gift') {
+    const giftees = Array.isArray(record.giftees)
+      ? record.giftees
+      : Array.isArray(nestedData.giftees)
+        ? nestedData.giftees
+        : undefined;
+    amount =
+      (giftees && giftees.length > 0 ? giftees.length : undefined) ||
+      pickPositiveNumber([
+        record.quantity,
+        nestedData.quantity,
+        record.gifts_count,
+        nestedData.gifts_count,
+        record.gift_count,
+        nestedData.gift_count,
+        record.sub_count,
+        nestedData.sub_count,
+        record.amount,
+        nestedData.amount,
+        giftObj?.amount,
+        giftObj?.quantity,
+      ]) ||
+      1;
+  } else if (eventType === 'sub-buy') {
+    amount =
+      pickPositiveNumber([
+        record.duration,
+        nestedData.duration,
+        record.months,
+        nestedData.months,
+        record.amount,
+        nestedData.amount,
+      ]) || 1;
+  }
+
+  const subMessage = pickNoteString([
+    giftObj?.message,
+    giftObj?.note,
+    giftObj?.text,
+    giftObj?.comment,
+    record.subMessage,
+    record.sub_message,
+    record.message,
+    record.note,
+    record.giftNote,
+    record.gift_note,
+    record.giftMessage,
+    record.gift_message,
+    record.comment,
+    record.text,
+    nestedData.subMessage,
+    nestedData.sub_message,
+    nestedData.message,
+    nestedData.note,
+    nestedData.giftNote,
+    nestedData.gift_note,
+    nestedData.giftMessage,
+    nestedData.gift_message,
+    nestedData.comment,
+    nestedData.text,
+  ]);
+
+  return {
+    eventType,
+    username,
+    amount,
+    subMessage,
+    avatarUrl: extractFollowerAvatar(body),
+  };
+}
+
+export function formatEventTtsText(
+  eventType: AlertEventType,
+  username: string,
+  amount?: number,
+  customFollowTemplate = '{username} started following',
+  channelName = 'sujalxsaini',
+  subMessage?: string
+): string {
+  const rawUser = (username || 'KickVIP').trim() || 'KickVIP';
+  const cleanUser = convertEmojisToSpokenText(rawUser) || rawUser;
+  const spokenNote = subMessage ? convertEmojisToSpokenText(subMessage) : '';
+
+  let headline = '';
+  if (eventType === 'kicks') {
+    const kicksAmt = Math.max(1, Math.round(amount || 100));
+    headline = `${cleanUser} sent ${kicksAmt} ${kicksAmt === 1 ? 'kick' : 'kicks'}`;
+  } else if (eventType === 'sub-gift') {
+    const giftCount = Math.max(1, Math.round(amount || 1));
+    headline = `${cleanUser} gifted ${giftCount} ${giftCount === 1 ? 'sub' : 'subs'}`;
+  } else if (eventType === 'sub-buy') {
+    const months = Math.max(1, Math.round(amount || 1));
+    headline =
+      months > 1
+        ? `${cleanUser} subscribed for ${months} months`
+        : `${cleanUser} subscribed`;
+  } else {
+    headline = formatTtsMessage(customFollowTemplate, cleanUser, channelName);
+  }
+
+  return spokenNote ? `${headline}. ${spokenNote}` : headline;
+}
+
+export function buildObsTextAlertUrl(
+  origin: string,
+  params: {
+    style: TextAlertStyle;
+    font: FontFamilyName;
+    sfx?: SfxPresetId;
+    tts: boolean;
+    voice: TtsLangCode;
+    duration: number;
+    rate?: number;
+    volume?: number;
+    eventFilter?: TextAlertEventFilter;
+    alertId?: string;
+  }
+): string {
+  const cleanOrigin = (origin || PUBLIC_RENDER_ORIGIN).replace(/\/+$/, '');
+  const searchParams = new URLSearchParams();
+  searchParams.set('obs', 'text-alerts');
+  if (params.alertId && params.alertId.trim()) {
+    searchParams.set('alertId', params.alertId.trim());
+    return `${cleanOrigin}/?${searchParams.toString()}`;
+  }
+  if (params.eventFilter && params.eventFilter !== 'all') {
+    searchParams.set('event', params.eventFilter);
+  }
+  searchParams.set('style', params.style);
+  searchParams.set('font', params.font);
+  if (params.sfx) {
+    searchParams.set('sfx', params.sfx);
+  }
+  searchParams.set('tts', params.tts ? '1' : '0');
+  searchParams.set('voice', params.voice);
+  searchParams.set('duration', String(params.duration));
+  if (typeof params.rate === 'number' && Number.isFinite(params.rate)) {
+    searchParams.set('rate', String(Number(params.rate.toFixed(2))));
+  }
+  if (typeof params.volume === 'number' && Number.isFinite(params.volume)) {
+    searchParams.set('volume', String(Number(params.volume.toFixed(2))));
+  }
+  return `${cleanOrigin}/?${searchParams.toString()}`;
+}
+
 export function buildObsCounterUrl(
   origin: string,
   params: {
@@ -255,6 +807,7 @@ export function buildObsCounterUrl(
     font: FontFamilyName;
     showGoal: boolean;
     goal?: number;
+    goalId?: string;
   }
 ): string {
   const cleanOrigin = origin.replace(/\/+$/, '');
@@ -263,7 +816,9 @@ export function buildObsCounterUrl(
   searchParams.set('template', params.template);
   searchParams.set('font', params.font);
   searchParams.set('showGoal', params.showGoal ? '1' : '0');
-  if (typeof params.goal === 'number' && Number.isFinite(params.goal) && params.goal > 0) {
+  if (params.goalId && params.goalId.trim()) {
+    searchParams.set('goalId', params.goalId.trim());
+  } else if (typeof params.goal === 'number' && Number.isFinite(params.goal) && params.goal > 0) {
     searchParams.set('goal', String(Math.round(params.goal)));
   }
   return `${cleanOrigin}/?${searchParams.toString()}`;
@@ -300,9 +855,27 @@ export function parseObsQueryOverrides(search: string, defaults?: Partial<AppSet
     'JetBrains Mono',
   ];
   const validSfx: SfxPresetId[] = ['cyber', 'royal', 'valorant', 'anime', 'glass', 'arcade'];
-  const validVoices: TtsLangCode[] = ['en-IN', 'hi-IN', 'en-US', 'en-GB', 'ja-JP', 'es-ES'];
+  const validVoices: TtsLangCode[] = [
+    'pro-hype-male',
+    'pro-caster-female',
+    'pro-vip-narrator',
+    'pro-uk-gent',
+    'pro-emotional-female',
+    'pro-funny-male',
+    'pro-aussie-chill',
+    'en-IN',
+    'hi-IN',
+    'en-US',
+    'en-GB',
+    'ja-JP',
+    'es-ES',
+  ];
+  const validTextStyles: TextAlertStyle[] = ['kinetic-neon', 'cyber-drop', 'gold-impact', 'glitch-pulse'];
+  const validEventFilters: TextAlertEventFilter[] = ['all', 'kicks', 'sub-gift', 'sub-buy'];
 
   const rawTemplate = params.get('template');
+  const rawStyle = params.get('style');
+  const rawEventFilter = params.get('event');
   const rawFont = params.get('font');
   const rawSfx = params.get('sfx');
   const rawVoice = params.get('voice');
@@ -312,11 +885,23 @@ export function parseObsQueryOverrides(search: string, defaults?: Partial<AppSet
   const rawVolume = params.get('volume');
   const rawShowGoal = params.get('showGoal');
   const rawGoal = params.get('goal');
+  const goalId = params.get('goalId')?.trim() || null;
+  const alertId = params.get('alertId')?.trim() || null;
+
+  const eventFilter: TextAlertEventFilter =
+    rawEventFilter && validEventFilters.includes(rawEventFilter as TextAlertEventFilter)
+      ? (rawEventFilter as TextAlertEventFilter)
+      : 'all';
 
   const alertTemplate: AlertTemplateId =
     rawTemplate && validAlertTemplates.includes(rawTemplate as AlertTemplateId)
       ? (rawTemplate as AlertTemplateId)
       : defaults?.activeAlertTemplate || 'neon';
+
+  const textAlertStyle: TextAlertStyle =
+    rawStyle && validTextStyles.includes(rawStyle as TextAlertStyle)
+      ? (rawStyle as TextAlertStyle)
+      : defaults?.textAlertStyle || 'kinetic-neon';
 
   const counterTemplate: CounterTemplateId =
     rawTemplate && validCounterTemplates.includes(rawTemplate as CounterTemplateId)
@@ -326,17 +911,21 @@ export function parseObsQueryOverrides(search: string, defaults?: Partial<AppSet
   const font: FontFamilyName =
     rawFont && validFonts.includes(rawFont as FontFamilyName)
       ? (rawFont as FontFamilyName)
-      : defaults?.selectedFont || 'Orbitron';
+      : obsMode === 'text-alerts'
+        ? defaults?.textAlertFont || 'Bebas Neue'
+        : defaults?.selectedFont || 'Orbitron';
 
   const sfx: SfxPresetId =
     rawSfx && validSfx.includes(rawSfx as SfxPresetId)
       ? (rawSfx as SfxPresetId)
-      : defaults?.sfxPreset || 'cyber';
+      : obsMode === 'text-alerts'
+        ? defaults?.textAlertSfxPreset || defaults?.sfxPreset || 'royal'
+        : defaults?.sfxPreset || 'cyber';
 
   const voice: TtsLangCode =
     rawVoice && validVoices.includes(rawVoice as TtsLangCode)
       ? (rawVoice as TtsLangCode)
-      : defaults?.ttsSettings?.lang || 'en-US';
+      : defaults?.ttsSettings?.lang || 'pro-hype-male';
 
   const ttsEnabled =
     rawTts !== null ? rawTts !== '0' && rawTts !== 'false' : (defaults?.ttsSettings?.enabled ?? true);
@@ -344,7 +933,9 @@ export function parseObsQueryOverrides(search: string, defaults?: Partial<AppSet
   const duration =
     rawDuration && Number.isFinite(Number(rawDuration))
       ? Math.min(30, Math.max(2, Number(rawDuration)))
-      : defaults?.alertDuration || 7;
+      : obsMode === 'text-alerts'
+        ? defaults?.textAlertDuration || 6
+        : defaults?.alertDuration || 7;
 
   const rate =
     rawRate && Number.isFinite(Number(rawRate))
@@ -367,8 +958,13 @@ export function parseObsQueryOverrides(search: string, defaults?: Partial<AppSet
       : defaults?.followerGoal || 1500;
 
   return {
-    obsMode: obsMode === 'alerts' || obsMode === 'counter' ? obsMode : null,
+    obsMode:
+      obsMode === 'alerts' || obsMode === 'counter' || obsMode === 'text-alerts'
+        ? obsMode
+        : null,
     alertTemplate,
+    textAlertStyle,
+    eventFilter,
     counterTemplate,
     font,
     sfx,
@@ -379,6 +975,14 @@ export function parseObsQueryOverrides(search: string, defaults?: Partial<AppSet
     volume,
     showGoal,
     goal,
+    goalId,
+    alertId,
+    hasGoalParam: rawGoal !== null,
+    hasTtsParam: rawTts !== null,
+    hasStyleParam: Boolean(rawStyle && validTextStyles.includes(rawStyle as TextAlertStyle)),
+    hasFontParam: Boolean(rawFont && validFonts.includes(rawFont as FontFamilyName)),
+    hasSfxParam: Boolean(rawSfx && validSfx.includes(rawSfx as SfxPresetId)),
+    hasTemplateParam: Boolean(rawTemplate),
     previewMode: params.get('preview') === '1',
     autostart: params.get('autostart') === '1',
   };

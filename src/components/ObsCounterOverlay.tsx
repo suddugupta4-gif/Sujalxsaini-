@@ -22,6 +22,13 @@ export const ObsCounterOverlay: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    fetch('/api/state')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.settings) setSettings(json.settings);
+      })
+      .catch(() => {});
+
     const es = new EventSource('/api/events?client=obs-counter');
 
     es.onmessage = (event) => {
@@ -37,19 +44,50 @@ export const ObsCounterOverlay: React.FC = () => {
       }
     };
 
+    const pollTimer = window.setInterval(async () => {
+      try {
+        const res = await fetch('/api/state');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json?.settings) setSettings(json.settings);
+      } catch {
+        // ignore transient poll error
+      }
+    }, 5000);
+
     return () => {
       es.close();
+      window.clearInterval(pollTimer);
     };
   }, []);
 
   const overrides = parseObsQueryOverrides(window.location.search, settings || undefined);
-  const count = settings?.followerCount ?? 1250;
-  const goal = overrides.goal || settings?.followerGoal || 1500;
-  const hasUrlGoalOverride = new URLSearchParams(window.location.search).has('goal');
-  const goalTitle =
-    !hasUrlGoalOverride && settings?.goalTitle
+  const matchedGoalItem = overrides.goalId
+    ? (settings?.goalLinkHistory || []).find((item) => item.id === overrides.goalId)
+    : undefined;
+
+  const count = settings?.followerCount ?? 463;
+  const goal = matchedGoalItem
+    ? matchedGoalItem.goal
+    : overrides.hasGoalParam
+      ? overrides.goal
+      : settings?.followerGoal || 500;
+  const goalTitle = matchedGoalItem
+    ? matchedGoalItem.goalTitle
+    : !overrides.hasGoalParam && settings?.goalTitle
       ? settings.goalTitle
       : `ROAD TO ${goal.toLocaleString()} FOLLOWERS`;
+  const template = matchedGoalItem
+    ? matchedGoalItem.template
+    : overrides.hasTemplateParam
+      ? overrides.counterTemplate
+      : settings?.activeCounterTemplate || overrides.counterTemplate;
+  const font = matchedGoalItem
+    ? matchedGoalItem.font
+    : overrides.hasFontParam
+      ? overrides.font
+      : settings?.counterFont || overrides.font;
+  const showGoal = matchedGoalItem ? matchedGoalItem.showGoal : overrides.showGoal;
   const recentFollowers = settings?.recentFollowers ?? [];
 
   return (
@@ -58,12 +96,12 @@ export const ObsCounterOverlay: React.FC = () => {
       className="w-screen h-screen overflow-hidden bg-transparent flex items-center justify-center p-2 sm:p-4 select-none"
     >
       <CounterCardRenderer
-        template={overrides.counterTemplate}
-        font={overrides.font}
+        template={template}
+        font={font}
         count={count}
         goal={goal}
         goalTitle={goalTitle}
-        showGoal={overrides.showGoal}
+        showGoal={showGoal}
         recentFollowers={recentFollowers}
         customAvatarUrl={settings?.customAvatarUrl}
       />
