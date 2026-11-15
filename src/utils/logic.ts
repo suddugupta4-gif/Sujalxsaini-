@@ -203,14 +203,14 @@ export function computeAdaptiveUsernameFontSize(
 ): number {
   const len = Math.max(1, (username || '').trim().length);
   const baseMax =
-    mode === 'alert-full' ? 22 : mode === 'alert-compact' ? 17 : 14;
-  const minSize = mode === 'counter-recent' ? 9 : 10;
+    mode === 'alert-full' ? 22 : mode === 'alert-compact' ? 17 : 21;
+  const minSize = mode === 'counter-recent' ? 12 : 10;
 
   if (len <= 12) return baseMax;
-  if (len <= 16) return Math.max(minSize, Math.round(baseMax * 0.85));
-  if (len <= 20) return Math.max(minSize, Math.round(baseMax * 0.72));
-  if (len <= 25) return Math.max(minSize, Math.round(baseMax * 0.6));
-  return Math.max(minSize, Math.round(baseMax * (14 / len)));
+  if (len <= 16) return Math.max(minSize, Math.round(baseMax * 0.88));
+  if (len <= 20) return Math.max(minSize, Math.round(baseMax * 0.78));
+  if (len <= 25) return Math.max(minSize, Math.round(baseMax * 0.68));
+  return Math.max(minSize, Math.round(baseMax * (15 / len)));
 }
 
 const EMOJI_WORD_MAP: Record<string, string> = {
@@ -440,6 +440,14 @@ export function formatTtsMessage(template: string, username: string, channelName
 }
 
 export const PUBLIC_RENDER_ORIGIN = 'https://sujalx-kick-studio.onrender.com';
+
+export function buildLiveObsPermanentUrl(
+  origin: string,
+  mode: 'alerts' | 'counter' | 'text-alerts'
+): string {
+  const cleanOrigin = (origin || PUBLIC_RENDER_ORIGIN).replace(/\/+$/, '');
+  return `${cleanOrigin}/?obs=${mode}`;
+}
 
 export function buildObsAlertUrl(
   origin: string,

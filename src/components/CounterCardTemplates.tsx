@@ -153,40 +153,40 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
     uniqueFollowers[0] || { username: 'RohanGamingIN' };
 
   const fontStyle = { fontFamily: `'${font}', sans-serif` };
+  const crispReadFontStack = "'Outfit', 'Rajdhani', system-ui, -apple-system, sans-serif";
+  const crispShadow = '0 2px 3px rgba(0, 0, 0, 0.98), 0 0 1px rgba(0, 0, 0, 1)';
 
-  // Clean Goal Progress Bar (sits cleanly at the top of the widget):
-  // Row 1: Full Goal Title + Percentage pill
-  // Row 2: Glowing animated plasma progress bar
-  // Row 3: Real Count / Goal on left + Remaining TO GO on right
+  // High-Contrast Goal Progress Bar & Crystal-Clear Follower Count Readout
   const renderAnimatedGoalProgressBar = (
     barGradientClass: string,
     accentHex: string,
     trackBorderClass: string
   ) => (
     <div>
-      {/* Row 1: Full Goal Title + Percentage */}
-      <div className="flex items-center justify-between gap-2 mb-1.5">
+      {/* Row 1: Goal Title + Large Crisp Percentage Pill */}
+      <div className="flex items-center justify-between gap-2 mb-2">
         <span
-          style={fontStyle}
-          className="text-xs sm:text-sm font-extrabold tracking-wider text-white uppercase whitespace-nowrap truncate"
+          style={{ ...fontStyle, textShadow: crispShadow }}
+          className="text-xs sm:text-base font-extrabold tracking-wide text-white uppercase whitespace-nowrap truncate"
         >
           {goalTitle || `ROAD TO ${goal.toLocaleString()} FOLLOWERS`}
         </span>
         <span
           style={{
-            color: accentHex,
-            borderColor: `${accentHex}55`,
-            backgroundColor: `${accentHex}18`,
+            color: '#FFFFFF',
+            borderColor: accentHex,
+            backgroundColor: '#04070B',
+            textShadow: crispShadow,
           }}
-          className="px-2 py-0.5 rounded border text-[10px] sm:text-[11px] font-mono font-extrabold tabular-nums whitespace-nowrap shrink-0"
+          className="px-2.5 py-0.5 rounded-md border text-xs sm:text-sm font-mono font-black tabular-nums whitespace-nowrap shrink-0"
         >
           {pct}%
         </span>
       </div>
 
-      {/* Row 2: Animated VFX Progress Bar Track */}
+      {/* Row 2: Solid High-Contrast Progress Bar Track */}
       <div
-        className={`relative h-3 w-full rounded-full bg-black/90 overflow-hidden border ${trackBorderClass}`}
+        className={`relative h-3.5 sm:h-4 w-full rounded-full bg-[#020408] overflow-hidden border ${trackBorderClass}`}
       >
         <motion.div
           initial={{ width: `${pct}%` }}
@@ -194,37 +194,47 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
           transition={{ type: 'spring', stiffness: 120, damping: 20 }}
           style={{
             backgroundColor: accentHex,
-            boxShadow: `0 0 14px ${accentHex}`,
+            boxShadow: `0 0 12px ${accentHex}`,
           }}
           className={`relative h-full rounded-full ${barGradientClass}`}
         >
-          {/* Animated diagonal plasma stripes overlay */}
           <div
             aria-hidden="true"
             className="absolute inset-0 animate-progress-stripes"
           />
-          {/* Leading-edge glowing spark VFX */}
           <span
             aria-hidden="true"
-            style={{ boxShadow: `0 0 12px #ffffff, 0 0 18px ${accentHex}` }}
-            className="absolute right-0 top-0 bottom-0 w-2.5 bg-white rounded-full animate-pulse"
+            style={{ boxShadow: `0 0 10px #ffffff, 0 0 14px ${accentHex}` }}
+            className="absolute right-0 top-0 bottom-0 w-2 bg-white rounded-full"
           />
         </motion.div>
       </div>
 
-      {/* Row 3: Real Follower Count / Target + Remaining Count */}
-      <div className="flex items-center justify-between gap-2 mt-1.5 text-[11px] font-mono tabular-nums">
-        <span style={{ color: accentHex }} className="font-bold whitespace-nowrap">
-          {count.toLocaleString()} / {goal.toLocaleString()} FOLLOWERS
-        </span>
-        <span className="text-slate-300 font-semibold whitespace-nowrap">
+      {/* Row 3: Prominent Bold White Follower Count + High-Contrast Goal & Remaining */}
+      <div
+        style={{ fontFamily: crispReadFontStack, textShadow: crispShadow }}
+        className="flex items-baseline justify-between gap-2 mt-2 tabular-nums"
+      >
+        <div className="flex items-baseline gap-1.5 whitespace-nowrap">
+          <span className="text-lg sm:text-xl font-black text-white leading-none">
+            {count.toLocaleString()}
+          </span>
+          <span className="text-xs sm:text-sm font-bold text-slate-200 leading-none">
+            / {goal.toLocaleString()} FOLLOWERS
+          </span>
+        </div>
+        <span
+          style={{ color: accentHex }}
+          className="text-xs sm:text-sm font-extrabold uppercase tracking-wide whitespace-nowrap shrink-0"
+        >
           {remaining > 0 ? `${remaining.toLocaleString()} TO GO` : 'GOAL REACHED!'}
         </span>
       </div>
     </div>
   );
 
-  // Recent Follow Box with Follower PFP + Top Username + Bottom "started following"
+  // Crystal-Clear Recent Follower Row on Solid Dark Backdrop:
+  // Full-width pure crisp white username + clear subtitle + compact badge on row 2
   const renderAnimatedRecentFollowsRow = (accentHex: string, hasTopDivider = true) => {
     const pfpSrc = getFollowerAvatarUrl(
       currentRecent.username,
@@ -240,16 +250,16 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
       <div
         className={`${
           hasTopDivider ? 'mt-3 pt-2.5 border-t border-white/15' : ''
-        } flex items-center justify-between gap-2.5`}
+        }`}
       >
-        {/* Left: Follower PFP + Top Username + Bottom "started following" */}
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+        <div className="rounded-xl bg-[#0B111A] border border-white/20 px-3 py-2.5 flex items-center gap-3">
+          {/* Crisp Follower PFP */}
           <div
             style={{
               borderColor: accentHex,
-              boxShadow: `0 0 12px ${accentHex}55`,
+              boxShadow: `0 0 10px ${accentHex}44`,
             }}
-            className="w-9 h-9 rounded-lg overflow-hidden border bg-[#060A0F] shrink-0"
+            className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg overflow-hidden border-2 bg-[#04070B] shrink-0"
           >
             <img
               src={pfpSrc}
@@ -264,43 +274,46 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
             />
           </div>
 
-          <div
-            style={fontStyle}
-            className="min-w-0 flex-1 flex flex-col items-start justify-center text-left"
-          >
-            {/* TOP: Follower Username (Auto-Shrinks Long Usernames to Fit Box) */}
+          {/* Right Column: Full-Width Crisp White Username + Clear Subtitle & Compact Badge */}
+          <div className="min-w-0 flex-1 flex flex-col justify-center text-left">
             <AutoFitUsername
               text={currentRecent.username}
-              fontFamily={`'${font}', sans-serif`}
+              fontFamily={crispReadFontStack}
               mode="counter-recent"
-              colorHex={accentHex}
-              textShadow={`0 0 10px ${accentHex}80`}
-              className="font-black"
-            />
-            {/* BOTTOM: started following (Auto-Fits Box) */}
-            <AutoFitUsername
-              text="started following"
-              fontFamily={`'${font}', sans-serif`}
-              mode="subtitle-compact"
               colorHex="#FFFFFF"
-              textShadow="0 0 8px rgba(255, 255, 255, 0.45)"
-              className="font-bold mt-0.5"
+              textShadow={crispShadow}
+              sharp
             />
+
+            <div className="flex items-center justify-between gap-2 mt-1">
+              <div
+                style={{ fontFamily: crispReadFontStack, textShadow: crispShadow }}
+                className="inline-flex items-center gap-1.5 min-w-0"
+              >
+                <span
+                  style={{ backgroundColor: accentHex }}
+                  className="w-2 h-2 rounded-full shrink-0"
+                />
+                <span className="text-xs sm:text-[13px] font-bold text-slate-100 whitespace-nowrap truncate">
+                  started following
+                </span>
+              </div>
+
+              <span
+                style={{
+                  color: accentHex,
+                  borderColor: `${accentHex}70`,
+                  backgroundColor: '#05080D',
+                }}
+                className="px-1.5 sm:px-2 py-0.5 rounded border text-[9px] sm:text-[10px] font-mono font-extrabold uppercase tracking-wider whitespace-nowrap shrink-0 inline-flex items-center gap-1"
+              >
+                <Zap className="w-2.5 h-2.5 shrink-0" />
+                <span className="sm:hidden">NEW</span>
+                <span className="hidden sm:inline">RECENT FOLLOW</span>
+              </span>
+            </div>
           </div>
         </div>
-
-        {/* Right: Compact Recent Badge */}
-        <span
-          style={{
-            color: accentHex,
-            borderColor: `${accentHex}55`,
-            backgroundColor: `${accentHex}18`,
-          }}
-          className="px-2 py-1 rounded border text-[9px] sm:text-[10px] font-mono font-bold uppercase tracking-wider whitespace-nowrap shrink-0 inline-flex items-center gap-1"
-        >
-          <Zap className="w-3 h-3 shrink-0" />
-          <span>RECENT FOLLOW</span>
-        </span>
       </div>
     );
   };
@@ -308,7 +321,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
   if (template === 'neon') {
     return (
       <div className="p-2 w-full">
-        <div className="relative overflow-hidden rounded-xl bg-[#070B0E]/95 border-2 border-[#53FC18] neon-pulse-green p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
+        <div className="relative overflow-hidden rounded-xl bg-[#05080C] border-2 border-[#53FC18] neon-pulse-green p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute top-0 left-0 w-1/2 h-[2px] bg-gradient-to-r from-transparent via-[#53FC18] to-transparent animate-laser-scan"
@@ -318,7 +331,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
             renderAnimatedGoalProgressBar(
               'bg-gradient-to-r from-[#16A34A] via-[#22C55E] to-[#53FC18]',
               '#53FC18',
-              'border-[#53FC18]/45'
+              'border-[#53FC18]/50'
             )}
 
           {renderAnimatedRecentFollowsRow('#53FC18', showGoal)}
@@ -330,10 +343,10 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
   if (template === 'gold') {
     return (
       <div className="p-2 w-full">
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-[#161209]/95 via-[#0B0905]/95 to-[#161209]/95 border-2 border-[#FFD700] neon-pulse-gold p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
+        <div className="relative overflow-hidden rounded-xl bg-[#0B0905] border-2 border-[#FFD700] neon-pulse-gold p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-[#FFD700]/12 to-transparent animate-shimmer"
+            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-[#FFD700]/10 to-transparent animate-shimmer"
           />
 
           <div className="relative z-10">
@@ -341,7 +354,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
               renderAnimatedGoalProgressBar(
                 'bg-gradient-to-r from-[#B8860B] via-[#FFD700] to-[#FFF3B0]',
                 '#FFD700',
-                'border-[#FFD700]/45'
+                'border-[#FFD700]/50'
               )}
 
             {renderAnimatedRecentFollowsRow('#FFD700', showGoal)}
@@ -357,7 +370,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
 
     return (
       <div className="p-2 w-full">
-        <div className="relative overflow-hidden rounded-lg bg-[#0B0E17]/95 border-2 border-[#FF0055] neon-pulse-crimson p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
+        <div className="relative overflow-hidden rounded-lg bg-[#070A12] border-2 border-[#FF0055] neon-pulse-crimson p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-[#53FC18]"
@@ -365,14 +378,17 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
 
           {showGoal && (
             <div>
-              <div className="flex items-center justify-between gap-2 text-xs font-mono mb-1.5">
+              <div className="flex items-center justify-between gap-2 mb-2">
                 <span
-                  style={fontStyle}
-                  className="text-white uppercase font-bold whitespace-nowrap truncate"
+                  style={{ ...fontStyle, textShadow: crispShadow }}
+                  className="text-xs sm:text-base font-extrabold tracking-wide text-white uppercase whitespace-nowrap truncate"
                 >
                   {goalTitle || `ROAD TO ${goal.toLocaleString()} FOLLOWERS`}
                 </span>
-                <span className="text-[#53FC18] tabular-nums font-bold whitespace-nowrap shrink-0">
+                <span
+                  style={{ textShadow: crispShadow }}
+                  className="px-2.5 py-0.5 rounded-md border border-[#53FC18] bg-[#04070B] text-white tabular-nums text-xs sm:text-sm font-mono font-black whitespace-nowrap shrink-0"
+                >
                   {pct}%
                 </span>
               </div>
@@ -380,19 +396,27 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
                 {Array.from({ length: segments }).map((_, idx) => (
                   <div
                     key={idx}
-                    className={`h-2.5 transition-all duration-300 ${
+                    className={`h-3 rounded-xs transition-all duration-300 ${
                       idx < activeSegments
-                        ? 'bg-gradient-to-r from-[#FF0055] to-[#53FC18] animate-pulse'
+                        ? 'bg-gradient-to-r from-[#FF0055] to-[#53FC18]'
                         : 'bg-slate-800'
                     }`}
                   />
                 ))}
               </div>
-              <div className="flex items-center justify-between gap-2 mt-1.5 text-[11px] font-mono tabular-nums">
-                <span className="text-[#53FC18] font-bold whitespace-nowrap">
-                  {count.toLocaleString()} / {goal.toLocaleString()} FOLLOWERS
-                </span>
-                <span className="text-slate-300 whitespace-nowrap">
+              <div
+                style={{ fontFamily: crispReadFontStack, textShadow: crispShadow }}
+                className="flex items-baseline justify-between gap-2 mt-2 tabular-nums"
+              >
+                <div className="flex items-baseline gap-1.5 whitespace-nowrap">
+                  <span className="text-lg sm:text-xl font-black text-white leading-none">
+                    {count.toLocaleString()}
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-200 leading-none">
+                    / {goal.toLocaleString()} FOLLOWERS
+                  </span>
+                </div>
+                <span className="text-[#53FC18] text-xs sm:text-sm font-extrabold uppercase tracking-wide whitespace-nowrap shrink-0">
                   {remaining > 0 ? `${remaining.toLocaleString()} TO GO` : 'GOAL REACHED!'}
                 </span>
               </div>
@@ -408,12 +432,12 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
   if (template === 'glass') {
     return (
       <div className="p-2 w-full">
-        <div className="relative overflow-hidden rounded-2xl backdrop-blur-2xl bg-slate-900/90 border-2 border-sky-400/60 shadow-[0_0_28px_rgba(56,189,248,0.35)] p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
+        <div className="relative overflow-hidden rounded-2xl bg-[#070D17] border-2 border-sky-400/85 shadow-[0_0_24px_rgba(56,189,248,0.35)] p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
           {showGoal &&
             renderAnimatedGoalProgressBar(
               'bg-gradient-to-r from-sky-400 via-emerald-300 to-fuchsia-400',
               '#38BDF8',
-              'border-sky-400/40'
+              'border-sky-400/50'
             )}
 
           {renderAnimatedRecentFollowsRow('#38BDF8', showGoal)}
@@ -425,12 +449,12 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
   if (template === 'matrix') {
     return (
       <div className="p-2 w-full">
-        <div className="relative overflow-hidden rounded-xl bg-[#040D08]/95 border-2 border-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.35)] p-4 sm:p-5 text-emerald-300 font-mono w-full max-w-lg mx-auto">
+        <div className="relative overflow-hidden rounded-xl bg-[#040B07] border-2 border-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.35)] p-4 sm:p-5 text-white font-mono w-full max-w-lg mx-auto">
           {showGoal &&
             renderAnimatedGoalProgressBar(
               'bg-gradient-to-r from-emerald-500 to-[#53FC18]',
               '#53FC18',
-              'border-emerald-500/45'
+              'border-emerald-400/50'
             )}
 
           {renderAnimatedRecentFollowsRow('#53FC18', showGoal)}
@@ -442,12 +466,12 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
   // 'holo' — Holographic Chrome Ticker
   return (
     <div className="p-2 w-full">
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#170B2A]/95 via-[#0B1228]/95 to-[#1F0B24]/95 border-2 border-fuchsia-400 shadow-[0_0_24px_rgba(232,121,249,0.45)] p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
+      <div className="relative overflow-hidden rounded-xl bg-[#0D071A] border-2 border-fuchsia-400 shadow-[0_0_24px_rgba(232,121,249,0.45)] p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
         {showGoal &&
           renderAnimatedGoalProgressBar(
             'bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-300',
             '#F0ABFC',
-            'border-fuchsia-400/45'
+            'border-fuchsia-400/50'
           )}
 
         {renderAnimatedRecentFollowsRow('#F0ABFC', showGoal)}

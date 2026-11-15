@@ -9,6 +9,7 @@ interface AutoFitUsernameProps {
   fontFamily?: string;
   className?: string;
   prefixNode?: React.ReactNode;
+  sharp?: boolean;
 }
 
 export const AutoFitUsername: React.FC<AutoFitUsernameProps> = ({
@@ -19,6 +20,7 @@ export const AutoFitUsername: React.FC<AutoFitUsernameProps> = ({
   fontFamily,
   className = '',
   prefixNode,
+  sharp = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
@@ -31,12 +33,13 @@ export const AutoFitUsername: React.FC<AutoFitUsernameProps> = ({
       : mode === 'alert-compact'
       ? 16
       : mode === 'counter-recent'
-      ? 14
+      ? 21
       : mode === 'subtitle-full'
-      ? 13
-      : 11.5;
+      ? 14
+      : 13.5;
 
-  const minFontPx = isSubtitle ? 8.5 : 8;
+  const minFontPx = mode === 'counter-recent' ? 12 : isSubtitle ? 10 : 8;
+  const hardFloorPx = mode === 'counter-recent' ? 10 : 6.5;
 
   const initialGuess = isSubtitle
     ? maxFontPx
@@ -54,8 +57,8 @@ export const AutoFitUsername: React.FC<AutoFitUsernameProps> = ({
     const inner = innerRef.current;
     if (!container || !inner) return;
 
-    // Leave 8px safety buffer so text-shadow/glow is never clipped
-    const availableWidth = Math.max(40, container.clientWidth - 8);
+    // Leave 6px safety buffer so text-shadow is never clipped
+    const availableWidth = Math.max(40, container.clientWidth - 6);
 
     let currentSize = maxFontPx;
     inner.style.fontSize = `${currentSize}px`;
@@ -65,12 +68,12 @@ export const AutoFitUsername: React.FC<AutoFitUsernameProps> = ({
       inner.style.fontSize = `${currentSize}px`;
     }
 
-    while (inner.scrollWidth > availableWidth && currentSize > 6.5) {
-      currentSize = Math.max(6.5, currentSize - 0.5);
+    while (inner.scrollWidth > availableWidth && currentSize > hardFloorPx) {
+      currentSize = Math.max(hardFloorPx, currentSize - 0.5);
       inner.style.fontSize = `${currentSize}px`;
     }
 
-    setFontSizePx(currentSize);
+    setFontSizePx((prev) => (prev === currentSize ? prev : currentSize));
   };
 
   useLayoutEffect(() => {
@@ -78,23 +81,47 @@ export const AutoFitUsername: React.FC<AutoFitUsernameProps> = ({
   }, [text, mode, fontFamily, maxFontPx, minFontPx]);
 
   useEffect(() => {
-    fitTextToBox();
+    let isCancelled = false;
+    let rafId: number | null = null;
+
+    const scheduleFit = () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        if (!isCancelled) {
+          fitTextToBox();
+        }
+      });
+    };
 
     if (typeof document !== 'undefined' && 'fonts' in document) {
       (document as Document & { fonts: FontFaceSet }).fonts.ready
-        .then(() => fitTextToBox())
+        .then(() => {
+          if (!isCancelled) scheduleFit();
+        })
         .catch(() => {});
     }
 
     const container = containerRef.current;
-    if (!container || typeof ResizeObserver === 'undefined') return;
+    if (!container || typeof ResizeObserver === 'undefined') {
+      return () => {
+        isCancelled = true;
+        if (rafId !== null) window.cancelAnimationFrame(rafId);
+      };
+    }
 
     const observer = new ResizeObserver(() => {
-      fitTextToBox();
+      scheduleFit();
     });
     observer.observe(container);
 
     return () => {
+      isCancelled = true;
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
       observer.disconnect();
     };
   }, [text, mode, fontFamily]);
@@ -110,10 +137,17 @@ export const AutoFitUsername: React.FC<AutoFitUsernameProps> = ({
           fontSize: `${fontSizePx}px`,
           color: colorHex,
           textShadow,
+          WebkitFontSmoothing: 'antialiased',
           ...(fontFamily ? { fontFamily } : {}),
         }}
-        className={`inline-flex items-center gap-1.5 leading-snug tracking-wide whitespace-nowrap ${
-          isSubtitle ? 'font-bold animate-vfx-text' : 'font-black animate-username-vfx'
+        className={`inline-flex items-center gap-1.5 leading-tight whitespace-nowrap ${
+          sharp
+            ? isSubtitle
+              ? 'font-bold tracking-normal'
+              : 'font-extrabold tracking-normal'
+            : isSubtitle
+              ? 'font-bold tracking-wide animate-vfx-text'
+              : 'font-black tracking-wide animate-username-vfx'
         }`}
       >
         {prefixNode}

@@ -10,6 +10,7 @@ import {
   buildObsAlertUrl,
   buildObsTextAlertUrl,
   buildObsCounterUrl,
+  buildLiveObsPermanentUrl,
   calculateGoalPercentage,
   getFollowerAvatarUrl,
   isMilestoneReached,
@@ -48,13 +49,20 @@ test('extractFollowerAvatar and getFollowerAvatarUrl resolve PFP URLs and SVG fa
   assert.equal(autoSvg.startsWith('data:image/svg+xml;utf8,'), true);
 });
 
-test('computeAdaptiveUsernameFontSize shrinks font size for long usernames', () => {
+test('computeAdaptiveUsernameFontSize shrinks font size for long usernames and keeps counter-recent crisp and large', () => {
   const shortSize = computeAdaptiveUsernameFontSize('Rohan', 'alert-full');
   const mediumSize = computeAdaptiveUsernameFontSize('RohanGamingIN_VIP', 'alert-full');
   const longSize = computeAdaptiveUsernameFontSize('SujalX_Ultimate_Pro_Legend_99', 'alert-full');
   assert.equal(shortSize > mediumSize, true);
   assert.equal(mediumSize > longSize, true);
   assert.equal(longSize >= 10, true);
+
+  const counterShort = computeAdaptiveUsernameFontSize('Rohan', 'counter-recent');
+  const counterMed = computeAdaptiveUsernameFontSize('ShooterSainiisLive', 'counter-recent');
+  const counterLong = computeAdaptiveUsernameFontSize('SujalX_Ultimate_Pro_Legend_99', 'counter-recent');
+  assert.equal(counterShort, 21);
+  assert.equal(counterMed >= 14, true);
+  assert.equal(counterLong >= 12, true);
 });
 
 test('formatTtsMessage replaces {username} and defaults to single-line started following text', () => {
@@ -205,6 +213,19 @@ test('buildObsAlertUrl, buildObsTextAlertUrl, and buildObsCounterUrl generate ro
   assert.equal(
     liveGoalIdUrl,
     'https://sujalx-kick-studio.onrender.com/?obs=counter&template=neon&font=Orbitron&showGoal=1&goalId=goal-abc123'
+  );
+
+  assert.equal(
+    buildLiveObsPermanentUrl('https://sujalx-kick-studio.onrender.com/', 'alerts'),
+    'https://sujalx-kick-studio.onrender.com/?obs=alerts'
+  );
+  assert.equal(
+    buildLiveObsPermanentUrl('https://sujalx-kick-studio.onrender.com/', 'counter'),
+    'https://sujalx-kick-studio.onrender.com/?obs=counter'
+  );
+  assert.equal(
+    buildLiveObsPermanentUrl('https://sujalx-kick-studio.onrender.com/', 'text-alerts'),
+    'https://sujalx-kick-studio.onrender.com/?obs=text-alerts'
   );
 });
 

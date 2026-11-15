@@ -23,7 +23,7 @@ import type {
 import {
   GOOGLE_FONTS,
   PUBLIC_RENDER_ORIGIN,
-  buildObsCounterUrl,
+  buildLiveObsPermanentUrl,
   calculateGoalPercentage,
 } from '../utils/logic';
 import { COUNTER_TEMPLATES, CounterCardRenderer } from './CounterCardTemplates';
@@ -127,11 +127,7 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
 
   const generatedCounterUrl = activeHistoryItem
     ? activeHistoryItem.url
-    : buildObsCounterUrl(origin, {
-        template: settings.activeCounterTemplate,
-        font: activeFont,
-        showGoal: settings.showGoalOnCounter ?? true,
-      });
+    : buildLiveObsPermanentUrl(origin, 'counter');
 
   const activeTemplateMeta =
     COUNTER_TEMPLATES.find((t) => t.id === settings.activeCounterTemplate) ||
@@ -332,15 +328,67 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
     }
   };
 
+  const syncCounterAppearanceLive = async (patch: {
+    template?: CounterTemplateId;
+    font?: FontFamilyName;
+    showGoal?: boolean;
+  }) => {
+    const nextTemplate = patch.template ?? settings.activeCounterTemplate;
+    const nextFont = patch.font ?? activeFont;
+    const nextShowGoal =
+      typeof patch.showGoal === 'boolean'
+        ? patch.showGoal
+        : settings.showGoalOnCounter ?? true;
+
+    if (activeGoalLinkId) {
+      try {
+        const res = await fetch(
+          `/api/goal-links/${encodeURIComponent(activeGoalLinkId)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              template: nextTemplate,
+              font: nextFont,
+              showGoal: nextShowGoal,
+              syncMain: true,
+            }),
+          }
+        );
+        const json = (await res.json()) as { settings?: AppSettings };
+        if (json?.settings) {
+          await onUpdateSettings({
+            activeCounterTemplate: json.settings.activeCounterTemplate,
+            counterFont: json.settings.counterFont,
+            showGoalOnCounter: nextShowGoal,
+            goalLinkHistory: json.settings.goalLinkHistory,
+          });
+          setSavedGoalBanner(true);
+          return;
+        }
+      } catch {
+        // fallback below
+      }
+    }
+
+    await onUpdateSettings({
+      ...(patch.template ? { activeCounterTemplate: nextTemplate } : {}),
+      ...(patch.font ? { counterFont: nextFont } : {}),
+      ...(typeof patch.showGoal === 'boolean'
+        ? { showGoalOnCounter: nextShowGoal }
+        : {}),
+    });
+    setSavedGoalBanner(true);
+  };
+
   const handleSelectTemplateAndPromptGoal = async (
     tplId: CounterTemplateId,
     defaultFont: FontFamilyName
   ) => {
-    await onUpdateSettings({
-      activeCounterTemplate: tplId,
-      counterFont: defaultFont,
+    await syncCounterAppearanceLive({
+      template: tplId,
+      font: defaultFont,
     });
-    setSavedGoalBanner(true);
     goalConfigRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setTimeout(() => {
       goalInputFieldRef.current?.focus();
@@ -490,8 +538,7 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
                 value={settings.activeCounterTemplate}
                 onChange={(e) => {
                   const nextTpl = e.target.value as CounterTemplateId;
-                  onUpdateSettings({ activeCounterTemplate: nextTpl });
-                  setSavedGoalBanner(true);
+                  syncCounterAppearanceLive({ template: nextTpl });
                 }}
                 className="w-full rounded-lg bg-[#0B1018] border border-slate-700 px-3 py-2.5 text-xs font-semibold text-white focus:outline-none focus:border-[#53FC18]"
               >
@@ -586,10 +633,9 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
                 id="counter-font-select"
                 value={activeFont}
                 onChange={(e) => {
-                  onUpdateSettings({
-                    counterFont: e.target.value as FontFamilyName,
+                  syncCounterAppearanceLive({
+                    font: e.target.value as FontFamilyName,
                   });
-                  setSavedGoalBanner(true);
                 }}
                 className="w-full rounded-lg bg-[#0B1018] border border-slate-700 px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-[#53FC18]"
               >
@@ -604,7 +650,13 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
                 aria-label="Goal Bar Banner Title"
                 value={goalTitleInput}
                 onChange={(e) => setGoalTitleInput(e.target.value)}
-                onBlur={() => handleApplyGoalAndGenerateLink()}
+                onBlur={() => handleLiveEditActiveGoalOnly()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleLiveEditActiveGoalOnly();
+                  }
+                }}
                 placeholder="ROAD TO 1,500 FOLLOWERS"
                 className="w-full rounded-lg bg-[#0B1018] border border-slate-700 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#53FC18]"
               />

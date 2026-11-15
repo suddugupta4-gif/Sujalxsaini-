@@ -14,8 +14,7 @@ import type { AppSettings, ObsClientCounts, SetupChecklist } from '../types';
 import {
   OBS_CUSTOM_CSS,
   PUBLIC_RENDER_ORIGIN,
-  buildObsAlertUrl,
-  buildObsCounterUrl,
+  buildLiveObsPermanentUrl,
 } from '../utils/logic';
 
 interface TabObsSetupGuideProps {
@@ -38,22 +37,8 @@ export const TabObsSetupGuide: React.FC<TabObsSetupGuideProps> = ({
 
   const origin = PUBLIC_RENDER_ORIGIN;
 
-  const alertsUrl = buildObsAlertUrl(origin, {
-    template: settings.activeAlertTemplate,
-    font: settings.selectedFont,
-    tts: settings.ttsSettings.enabled,
-    voice: settings.ttsSettings.lang,
-    duration: settings.alertDuration,
-    rate: settings.ttsSettings.rate,
-    volume: settings.ttsSettings.volume,
-  });
-
-  const counterUrl = buildObsCounterUrl(origin, {
-    template: settings.activeCounterTemplate,
-    font: settings.counterFont || settings.selectedFont,
-    showGoal: settings.showGoalOnCounter ?? true,
-    goal: settings.followerGoal,
-  });
+  const alertsUrl = buildLiveObsPermanentUrl(origin, 'alerts');
+  const counterUrl = buildLiveObsPermanentUrl(origin, 'counter');
 
   const toggleStep = (key: keyof SetupChecklist) => {
     onUpdateSettings({

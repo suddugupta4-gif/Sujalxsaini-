@@ -41,22 +41,18 @@
 @keyframes vfxTextGlow {
   0%, 100% {
     opacity: 1;
-    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
   }
   50% {
     opacity: 1;
-    filter: drop-shadow(0 0 10px rgba(83, 252, 24, 0.85));
   }
 }
 
 @keyframes usernameVfxPop {
   0%, 100% {
     opacity: 1;
-    filter: brightness(1);
   }
   50% {
     opacity: 1;
-    filter: brightness(1.18);
   }
 }
 

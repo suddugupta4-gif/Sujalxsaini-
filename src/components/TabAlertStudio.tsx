@@ -23,7 +23,7 @@ import {
   GOOGLE_FONTS,
   PUBLIC_RENDER_ORIGIN,
   TTS_LANGUAGES,
-  buildObsAlertUrl,
+  buildLiveObsPermanentUrl,
   formatTtsMessage,
 } from '../utils/logic';
 import { speakAlertTts } from '../utils/soundEngine';
@@ -73,15 +73,7 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
 
   const origin = PUBLIC_RENDER_ORIGIN;
 
-  const generatedAlertUrl = buildObsAlertUrl(origin, {
-    template: settings.activeAlertTemplate,
-    font: settings.selectedFont,
-    tts: settings.ttsSettings.enabled,
-    voice: settings.ttsSettings.lang,
-    duration: settings.alertDuration,
-    rate: settings.ttsSettings.rate,
-    volume: settings.ttsSettings.volume,
-  });
+  const generatedAlertUrl = buildLiveObsPermanentUrl(origin, 'alerts');
 
   const activeTemplateMeta =
     ALERT_TEMPLATES.find((t) => t.id === settings.activeAlertTemplate) ||
@@ -275,10 +267,10 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
             <div>
               <div className="text-[11px] font-mono uppercase tracking-wider text-[#53FC18]">
-                All-in-One Alert &amp; TTS Settings · Live Updates Even on Existing OBS Links
+                All-in-One Live Alert &amp; TTS Settings · Zero Link Changes Needed
               </div>
               <h3 className="text-base font-bold text-white mt-0.5">
-                Select Template, Font, Duration, Speed, Volume &amp; English / Hindi Accent
+                Change Template, Font, Duration, Speed, Volume &amp; Accent Live Anytime
               </h3>
             </div>
 
@@ -289,7 +281,7 @@ export const TabAlertStudio: React.FC<TabAlertStudioProps> = ({
               className="inline-flex items-center gap-2 rounded-lg bg-[#53FC18] hover:bg-[#45d912] text-slate-950 font-extrabold text-xs px-4 py-2.5 shadow-[0_0_20px_rgba(83,252,24,0.3)] transition-all cursor-pointer shrink-0"
             >
               <Save className="w-4 h-4" />
-              <span>Save Settings &amp; Generate Single OBS Link</span>
+              <span>Save Live Settings &amp; Copy Permanent Link</span>
             </button>
           </div>
 

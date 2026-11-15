@@ -2,7 +2,7 @@
   "channelName": "sujalxsaini",
   "channelUrl": "https://kick.com/sujalxsaini",
   "pin": "1234",
-  "followerCount": 466,
+  "followerCount": 501,
   "followerGoal": 500,
   "goalTitle": "ROAD TO 500 FOLLOWERS",
   "showGoalOnCounter": true,
@@ -10,7 +10,7 @@
   "alertsMuted": false,
   "activeAlertTemplate": "neon",
   "activeCounterTemplate": "neon",
-  "selectedFont": "Rajdhani",
+  "selectedFont": "Orbitron",
   "counterFont": "Orbitron",
   "textAlertFont": "Orbitron",
   "textAlertStyle": "gold-impact",
@@ -29,6 +29,13 @@
     "volume": 1
   },
   "recentFollowers": [
+    {
+      "id": "fol-1794738417638-k9e2",
+      "username": "AaravSniper_IN",
+      "timestamp": "2026-11-15T10:26:57.638Z",
+      "source": "test",
+      "eventType": "follow"
+    },
     {
       "id": "fol-1794566283178-30gd",
       "username": "LiveSyncFriend",

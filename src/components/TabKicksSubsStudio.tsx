@@ -29,7 +29,7 @@ import {
   PUBLIC_RENDER_ORIGIN,
   TEXT_ALERT_STYLES,
   TTS_LANGUAGES,
-  buildObsTextAlertUrl,
+  buildLiveObsPermanentUrl,
   formatEventTtsText,
 } from '../utils/logic';
 import {
@@ -128,23 +128,115 @@ export const TabKicksSubsStudio: React.FC<TabKicksSubsStudioProps> = ({
     }
   }, [settings.textAlertLinkHistory, activeLinkId]);
 
+  useEffect(() => {
+    if (settings.textAlertStyle) setSelectedStyle(settings.textAlertStyle);
+    if (settings.textAlertFont) setSelectedFont(settings.textAlertFont);
+    if (settings.textAlertSfxPreset) setSelectedSfxPreset(settings.textAlertSfxPreset);
+    if (settings.textAlertDuration) setSelectedDuration(settings.textAlertDuration);
+    setSelectedTtsEnabled(settings.ttsSettings.enabled);
+    setSelectedVoice(settings.ttsSettings.lang);
+    setSelectedRate(settings.ttsSettings.rate || 1.0);
+    setSelectedVolume(settings.ttsSettings.volume ?? 1.0);
+  }, [
+    settings.textAlertStyle,
+    settings.textAlertFont,
+    settings.textAlertSfxPreset,
+    settings.textAlertDuration,
+    settings.ttsSettings.enabled,
+    settings.ttsSettings.lang,
+    settings.ttsSettings.rate,
+    settings.ttsSettings.volume,
+  ]);
+
   const activeUserDisplay = previewUsername.trim() || 'KaranClutchX';
   const historyList = settings.textAlertLinkHistory || [];
   const activeSavedItem = historyList.find((item) => item.id === activeLinkId);
 
   const generatedPreviewUrl = activeSavedItem
     ? activeSavedItem.url
-    : buildObsTextAlertUrl(PUBLIC_RENDER_ORIGIN, {
-        style: selectedStyle,
-        font: selectedFont,
-        sfx: selectedSfxPreset,
-        tts: selectedTtsEnabled,
-        voice: selectedVoice,
-        duration: selectedDuration,
-        rate: selectedRate,
-        volume: selectedVolume,
-        eventFilter: selectedEventFilter,
-      });
+    : buildLiveObsPermanentUrl(PUBLIC_RENDER_ORIGIN, 'text-alerts');
+
+  const syncLiveControlsToServerAndActiveLink = async (patch: {
+    eventFilter?: TextAlertEventFilter;
+    style?: TextAlertStyle;
+    font?: FontFamilyName;
+    sfxPreset?: SfxPresetId;
+    duration?: number;
+    ttsEnabled?: boolean;
+    voice?: TtsLangCode;
+    rate?: number;
+    volume?: number;
+  }) => {
+    const nextEventFilter = patch.eventFilter ?? selectedEventFilter;
+    const nextStyle = patch.style ?? selectedStyle;
+    const nextFont = patch.font ?? selectedFont;
+    const nextSfx = patch.sfxPreset ?? selectedSfxPreset;
+    const nextDuration = patch.duration ?? selectedDuration;
+    const nextTts = patch.ttsEnabled ?? selectedTtsEnabled;
+    const nextVoice = patch.voice ?? selectedVoice;
+    const nextRate = patch.rate ?? selectedRate;
+    const nextVolume = patch.volume ?? selectedVolume;
+
+    const settingsUpdate: Partial<AppSettings> = {};
+    if (patch.style !== undefined) settingsUpdate.textAlertStyle = nextStyle;
+    if (patch.font !== undefined) settingsUpdate.textAlertFont = nextFont;
+    if (patch.sfxPreset !== undefined) settingsUpdate.textAlertSfxPreset = nextSfx;
+    if (patch.duration !== undefined) settingsUpdate.textAlertDuration = nextDuration;
+    if (
+      patch.ttsEnabled !== undefined ||
+      patch.voice !== undefined ||
+      patch.rate !== undefined ||
+      patch.volume !== undefined
+    ) {
+      settingsUpdate.ttsSettings = {
+        ...settings.ttsSettings,
+        enabled: nextTts,
+        lang: nextVoice,
+        rate: nextRate,
+        volume: nextVolume,
+      };
+    }
+
+    if (activeLinkId && activeSavedItem) {
+      try {
+        const res = await fetch(
+          `/api/text-alert-links/${encodeURIComponent(activeLinkId)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              eventFilter: nextEventFilter,
+              style: nextStyle,
+              font: nextFont,
+              sfxPreset: nextSfx,
+              duration: nextDuration,
+              ttsEnabled: nextTts,
+              voice: nextVoice,
+              rate: nextRate,
+              volume: nextVolume,
+              syncMain: true,
+            }),
+          }
+        );
+        const json = (await res.json()) as { settings?: AppSettings };
+        if (json?.settings) {
+          await onUpdateSettings({
+            ...settingsUpdate,
+            textAlertLinkHistory: json.settings.textAlertLinkHistory,
+          });
+          setSavedBanner(true);
+          return;
+        }
+      } catch {
+        // Fallback to settings update below
+      }
+    }
+
+    if (Object.keys(settingsUpdate).length > 0) {
+      await onUpdateSettings(settingsUpdate);
+      setSavedBanner(true);
+    }
+  };
 
   const handleGenerateAndSaveLink = async () => {
     try {
@@ -518,9 +610,11 @@ export const TabKicksSubsStudio: React.FC<TabKicksSubsStudioProps> = ({
               id="kicks-gen-event"
               data-testid="kicks-link-event-select"
               value={selectedEventFilter}
-              onChange={(e) =>
-                setSelectedEventFilter(e.target.value as TextAlertEventFilter)
-              }
+              onChange={(e) => {
+                const nextFilter = e.target.value as TextAlertEventFilter;
+                setSelectedEventFilter(nextFilter);
+                syncLiveControlsToServerAndActiveLink({ eventFilter: nextFilter });
+              }}
               className="w-full rounded bg-[#0B1018] border border-slate-700 px-2.5 py-2 text-xs font-semibold text-white focus:outline-none focus:border-[#53FC18]"
             >
               {EVENT_FILTER_OPTIONS.map((opt) => (
@@ -542,9 +636,11 @@ export const TabKicksSubsStudio: React.FC<TabKicksSubsStudioProps> = ({
               id="kicks-gen-style"
               data-testid="kicks-link-style-select"
               value={selectedStyle}
-              onChange={(e) =>
-                setSelectedStyle(e.target.value as TextAlertStyle)
-              }
+              onChange={(e) => {
+                const nextStyle = e.target.value as TextAlertStyle;
+                setSelectedStyle(nextStyle);
+                syncLiveControlsToServerAndActiveLink({ style: nextStyle });
+              }}
               className="w-full rounded bg-[#0B1018] border border-slate-700 px-2.5 py-2 text-xs font-semibold text-white focus:outline-none focus:border-[#53FC18]"
             >
               {TEXT_ALERT_STYLES.map((st) => (
@@ -566,9 +662,11 @@ export const TabKicksSubsStudio: React.FC<TabKicksSubsStudioProps> = ({
               id="kicks-gen-font"
               data-testid="kicks-link-font-select"
               value={selectedFont}
-              onChange={(e) =>
-                setSelectedFont(e.target.value as FontFamilyName)
-              }
+              onChange={(e) => {
+                const nextFont = e.target.value as FontFamilyName;
+                setSelectedFont(nextFont);
+                syncLiveControlsToServerAndActiveLink({ font: nextFont });
+              }}
               className="w-full rounded bg-[#0B1018] border border-slate-700 px-2.5 py-2 text-xs font-semibold text-white focus:outline-none focus:border-[#53FC18]"
             >
               {GOOGLE_FONTS.map((f) => (
@@ -611,7 +709,7 @@ export const TabKicksSubsStudio: React.FC<TabKicksSubsStudioProps> = ({
               onChange={(e) => {
                 const nextSfx = e.target.value as SfxPresetId;
                 setSelectedSfxPreset(nextSfx);
-                onUpdateSettings({ textAlertSfxPreset: nextSfx });
+                syncLiveControlsToServerAndActiveLink({ sfxPreset: nextSfx });
                 playSynthesizedSfx(nextSfx, settings.customSfxUrl, settings.alertsMuted);
               }}
               className="w-full rounded bg-[#0B1018] border border-slate-700 px-2.5 py-2 text-xs font-semibold text-white focus:outline-none focus:border-amber-400"
@@ -634,7 +732,11 @@ export const TabKicksSubsStudio: React.FC<TabKicksSubsStudioProps> = ({
               </label>
               <button
                 type="button"
-                onClick={() => setSelectedTtsEnabled((v) => !v)}
+                onClick={() => {
+                  const nextTts = !selectedTtsEnabled;
+                  setSelectedTtsEnabled(nextTts);
+                  syncLiveControlsToServerAndActiveLink({ ttsEnabled: nextTts });
+                }}
                 className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold whitespace-nowrap shrink-0 cursor-pointer ${
                   selectedTtsEnabled
                     ? 'bg-[#53FC18]/20 text-[#53FC18] border border-[#53FC18]/50'
@@ -651,12 +753,7 @@ export const TabKicksSubsStudio: React.FC<TabKicksSubsStudioProps> = ({
               onChange={(e) => {
                 const nextVoice = e.target.value as TtsLangCode;
                 setSelectedVoice(nextVoice);
-                onUpdateSettings({
-                  ttsSettings: {
-                    ...settings.ttsSettings,
-                    lang: nextVoice,
-                  },
-                });
+                syncLiveControlsToServerAndActiveLink({ voice: nextVoice });
               }}
               className="w-full rounded bg-[#0B1018] border border-slate-700 px-2.5 py-2 text-xs font-semibold text-white focus:outline-none focus:border-[#53FC18]"
             >
@@ -684,7 +781,11 @@ export const TabKicksSubsStudio: React.FC<TabKicksSubsStudioProps> = ({
               max={15}
               step={1}
               value={selectedDuration}
-              onChange={(e) => setSelectedDuration(Number(e.target.value))}
+              onChange={(e) => {
+                const nextDur = Number(e.target.value);
+                setSelectedDuration(nextDur);
+                syncLiveControlsToServerAndActiveLink({ duration: nextDur });
+              }}
               className="w-full accent-amber-400"
             />
           </div>
@@ -705,7 +806,11 @@ export const TabKicksSubsStudio: React.FC<TabKicksSubsStudioProps> = ({
               max={1.5}
               step={0.1}
               value={selectedRate}
-              onChange={(e) => setSelectedRate(Number(e.target.value))}
+              onChange={(e) => {
+                const nextRate = Number(e.target.value);
+                setSelectedRate(nextRate);
+                syncLiveControlsToServerAndActiveLink({ rate: nextRate });
+              }}
               className="w-full accent-[#53FC18]"
             />
           </div>
@@ -726,7 +831,11 @@ export const TabKicksSubsStudio: React.FC<TabKicksSubsStudioProps> = ({
               max={1.0}
               step={0.05}
               value={selectedVolume}
-              onChange={(e) => setSelectedVolume(Number(e.target.value))}
+              onChange={(e) => {
+                const nextVol = Number(e.target.value);
+                setSelectedVolume(nextVol);
+                syncLiveControlsToServerAndActiveLink({ volume: nextVol });
+              }}
               className="w-full accent-[#53FC18]"
             />
           </div>
