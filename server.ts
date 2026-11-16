@@ -27,6 +27,9 @@ import {
   formatEventTtsText,
   isMilestoneReached,
   parseKickEventDetails,
+  recordFollowedUsername,
+  seedFollowedUsernamesFromRecent,
+  shouldSuppressDuplicateFollowAlert,
 } from './src/utils/logic.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -88,6 +91,12 @@ const DEFAULT_SETTINGS: AppSettings = {
       timestamp: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
       source: 'kick-webhook',
     },
+  ],
+  followedUsernamesHistory: [
+    'rohangamingin',
+    'apexvalkyrie',
+    'karanclutchx',
+    'neonsamurai99',
   ],
   webhookLogs: [
     {
@@ -163,6 +172,14 @@ function loadSettings(): AppSettings {
         recentFollowers: Array.isArray(parsed.recentFollowers)
           ? parsed.recentFollowers
           : DEFAULT_SETTINGS.recentFollowers,
+        followedUsernamesHistory: seedFollowedUsernamesFromRecent(
+          Array.isArray(parsed.followedUsernamesHistory)
+            ? parsed.followedUsernamesHistory
+            : DEFAULT_SETTINGS.followedUsernamesHistory,
+          Array.isArray(parsed.recentFollowers)
+            ? parsed.recentFollowers
+            : DEFAULT_SETTINGS.recentFollowers
+        ),
         webhookLogs: Array.isArray(parsed.webhookLogs)
           ? parsed.webhookLogs
           : DEFAULT_SETTINGS.webhookLogs,
@@ -1251,12 +1268,32 @@ async function startServer() {
       }
     }
 
+    const isSimulated = req.headers['x-sujalx-simulated'] === 'true';
+    const webhookSource: 'simulator' | 'kick-webhook' = isSimulated
+      ? 'simulator'
+      : 'kick-webhook';
+
+    const isDuplicateFollow = shouldSuppressDuplicateFollowAlert({
+      eventType: details.eventType,
+      source: webhookSource,
+      username,
+      followedHistory: appState.followedUsernamesHistory,
+    });
+
+    if (!isDuplicateFollow && details.eventType === 'follow') {
+      appState.followedUsernamesHistory = recordFollowedUsername(
+        username,
+        appState.followedUsernamesHistory
+      );
+    }
+
     const logEntry: WebhookLogEntry = {
       id: `wh-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       timestamp: nowIso,
       eventType: eventHeader,
       username,
       status: 200,
+      duplicateFollowSuppressed: isDuplicateFollow || undefined,
       headers: sanitizedHeaders,
       payload:
         req.body && typeof req.body === 'object'
@@ -1267,20 +1304,29 @@ async function startServer() {
     appState.webhookLogs = [logEntry, ...appState.webhookLogs.slice(0, 39)];
     appState.setupChecklist.webhookStep4SimulatedTest = true;
 
-    const isSimulated = req.headers['x-sujalx-simulated'] === 'true';
+    if (isDuplicateFollow) {
+      saveSettings(appState);
+    }
 
     // Respond 200 OK immediately so Kick never times out the webhook
     res.status(200).json({
       received: true,
+      duplicateFollowSuppressed: isDuplicateFollow,
       event: eventHeader,
       eventType: details.eventType,
       username,
       amount: details.amount,
       followerCount:
-        details.eventType === 'follow'
+        details.eventType === 'follow' && !isDuplicateFollow
           ? appState.followerCount + 1
           : appState.followerCount,
     });
+
+    if (isDuplicateFollow) {
+      broadcastEvent('WEBHOOK_RECEIVED', logEntry);
+      broadcastEvent('SETTINGS_UPDATED', appState);
+      return;
+    }
 
     if (details.eventType === 'follow' && !avatarUrl && username && username !== 'KickUser') {
       avatarUrl = await fetchKickUserAvatar(username);
@@ -1288,7 +1334,7 @@ async function startServer() {
 
     await processFollowEvent(
       username,
-      isSimulated ? 'simulator' : 'kick-webhook',
+      webhookSource,
       details.eventType === 'follow',
       {
         eventType: details.eventType,
@@ -1315,6 +1361,20 @@ async function startServer() {
     const username = details.username || extractFollowerUsername(req.body);
     const nowIso = new Date().toISOString();
 
+    const isDuplicateFollow = shouldSuppressDuplicateFollowAlert({
+      eventType: details.eventType,
+      source: 'simulator',
+      username,
+      followedHistory: appState.followedUsernamesHistory,
+    });
+
+    if (!isDuplicateFollow && details.eventType === 'follow') {
+      appState.followedUsernamesHistory = recordFollowedUsername(
+        username,
+        appState.followedUsernamesHistory
+      );
+    }
+
     const simulatedPayload = {
       event: eventHeader,
       channel: {
@@ -1334,6 +1394,7 @@ async function startServer() {
       eventType: eventHeader,
       username,
       status: 200,
+      duplicateFollowSuppressed: isDuplicateFollow || undefined,
       headers: {
         'kick-event-type': eventHeader,
         'content-type': 'application/json',
@@ -1344,6 +1405,20 @@ async function startServer() {
 
     appState.webhookLogs = [logEntry, ...appState.webhookLogs.slice(0, 39)];
     appState.setupChecklist.webhookStep4SimulatedTest = true;
+
+    if (isDuplicateFollow) {
+      saveSettings(appState);
+      broadcastEvent('WEBHOOK_RECEIVED', logEntry);
+      broadcastEvent('SETTINGS_UPDATED', appState);
+      res.status(200).json({
+        received: true,
+        duplicateFollowSuppressed: true,
+        alert: null,
+        log: logEntry,
+        settings: appState,
+      });
+      return;
+    }
 
     const alertPayload = await processFollowEvent(
       username,
@@ -1359,6 +1434,7 @@ async function startServer() {
 
     res.status(200).json({
       received: true,
+      duplicateFollowSuppressed: false,
       alert: alertPayload,
       log: logEntry,
       settings: appState,

@@ -18,6 +18,11 @@ import {
   validatePin,
   parseObsQueryOverrides,
   resolveLiveObsAlertConfig,
+  normalizeFollowerKey,
+  hasUserAlreadyFollowed,
+  recordFollowedUsername,
+  seedFollowedUsernamesFromRecent,
+  shouldSuppressDuplicateFollowAlert,
 } from './logic';
 
 test('extractFollowerUsername handles official Kick webhook payload shapes', () => {
@@ -364,3 +369,105 @@ test('resolveLiveObsAlertConfig updates past OBS links live without regenerating
   assert.equal(resolvedKicks.font, 'Bebas Neue');
   assert.equal(resolvedKicks.duration, 6);
 });
+
+test('one-time follow rule blocks repeat follow overlay & TTS after unfollow+refollow while allowing kicks/subs and manual tests', () => {
+  assert.equal(normalizeFollowerKey('  AaravSniper_IN  '), 'aaravsniper_in');
+
+  let history: string[] = [];
+  assert.equal(
+    shouldSuppressDuplicateFollowAlert({
+      eventType: 'follow',
+      source: 'kick-webhook',
+      username: 'OneTimeViewer',
+      followedHistory: history,
+    }),
+    false
+  );
+
+  // First follow is recorded
+  history = recordFollowedUsername('OneTimeViewer', history);
+  assert.equal(hasUserAlreadyFollowed('onetimeviewer', history), true);
+
+  // Repeat follow (e.g. viewer unfollowed and followed again, even with different casing) is suppressed
+  assert.equal(
+    shouldSuppressDuplicateFollowAlert({
+      eventType: 'follow',
+      source: 'kick-webhook',
+      username: 'onetimeviewer',
+      followedHistory: history,
+    }),
+    true
+  );
+  assert.equal(
+    shouldSuppressDuplicateFollowAlert({
+      eventType: 'follow',
+      source: 'simulator',
+      username: 'ONETIMEVIEWER',
+      followedHistory: history,
+    }),
+    true
+  );
+
+  // Manual dashboard test & replay must STILL work for the streamer
+  assert.equal(
+    shouldSuppressDuplicateFollowAlert({
+      eventType: 'follow',
+      source: 'test',
+      username: 'OneTimeViewer',
+      followedHistory: history,
+    }),
+    false
+  );
+  assert.equal(
+    shouldSuppressDuplicateFollowAlert({
+      eventType: 'follow',
+      source: 'replay',
+      username: 'OneTimeViewer',
+      followedHistory: history,
+    }),
+    false
+  );
+
+  // Kicks, sub gifts, and sub buys from the SAME user must NEVER be suppressed
+  assert.equal(
+    shouldSuppressDuplicateFollowAlert({
+      eventType: 'kicks',
+      source: 'kick-webhook',
+      username: 'OneTimeViewer',
+      followedHistory: history,
+    }),
+    false
+  );
+  assert.equal(
+    shouldSuppressDuplicateFollowAlert({
+      eventType: 'sub-gift',
+      source: 'kick-webhook',
+      username: 'OneTimeViewer',
+      followedHistory: history,
+    }),
+    false
+  );
+  assert.equal(
+    shouldSuppressDuplicateFollowAlert({
+      eventType: 'sub-buy',
+      source: 'kick-webhook',
+      username: 'OneTimeViewer',
+      followedHistory: history,
+    }),
+    false
+  );
+
+  // Seed merges existing follow webhooks/simulator entries while ignoring test/replay and kicks
+  const seeded = seedFollowedUsernamesFromRecent(['RohanGamingIN'], [
+    { username: 'ShooterSainiisLive', source: 'kick-webhook', eventType: 'follow' },
+    { username: 'AaravSniper_IN', source: 'simulator' },
+    { username: 'ManualTesterOnly', source: 'test', eventType: 'follow' },
+    { username: 'KicksOnlySender', source: 'kick-webhook', eventType: 'kicks' },
+  ]);
+  assert.equal(hasUserAlreadyFollowed('rohangamingin', seeded), true);
+  assert.equal(hasUserAlreadyFollowed('shootersainiislive', seeded), true);
+  assert.equal(hasUserAlreadyFollowed('aaravsniper_in', seeded), true);
+  assert.equal(hasUserAlreadyFollowed('manualtesteronly', seeded), false);
+  assert.equal(hasUserAlreadyFollowed('kicksonlysender', seeded), false);
+});
+

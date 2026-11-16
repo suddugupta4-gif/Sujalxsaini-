@@ -173,11 +173,17 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
       });
       const data = await response.json();
       if (response.ok && data.received) {
-        setSimStatus(
-          simEventType === 'channel.followed'
-            ? `200 OK — Follow webhook processed for "${cleanUser}"! Follower Count: ${data.followerCount}`
-            : `200 OK — ${simEventType} webhook processed for "${cleanUser}" (${data.amount})${cleanNote ? ` + note "${cleanNote}"` : ''}!`
-        );
+        if (simEventType === 'channel.followed' && data.duplicateFollowSuppressed) {
+          setSimStatus(
+            `200 OK — "${cleanUser}" already followed once: repeat follow overlay & TTS blocked (1-Time Follow Rule).`
+          );
+        } else {
+          setSimStatus(
+            simEventType === 'channel.followed'
+              ? `200 OK — Follow webhook processed once for "${cleanUser}"! Follower Count: ${data.followerCount}`
+              : `200 OK — ${simEventType} webhook processed for "${cleanUser}" (${data.amount})${cleanNote ? ` + note "${cleanNote}"` : ''}!`
+          );
+        }
       } else {
         setSimStatus('Webhook returned an unexpected status.');
       }
@@ -382,13 +388,18 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
         {/* Step 3: Built-in Webhook Simulator & cURL Tester */}
         <section className="lg:col-span-6 rounded-xl bg-[#0D131C] border border-slate-800 p-6 flex flex-col justify-between space-y-5">
           <div className="space-y-4">
-            <div className="border-b border-slate-800 pb-3">
-              <div className="text-xs font-mono uppercase tracking-wider text-[#53FC18]">
-                03. End-to-End Webhook Simulator & Terminal cURL Tester
+            <div className="border-b border-slate-800 pb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-xs font-mono uppercase tracking-wider text-[#53FC18]">
+                  03. End-to-End Webhook Simulator & Terminal cURL Tester
+                </div>
+                <h3 className="text-lg font-bold text-white mt-0.5">
+                  Test POST /api/webhook/kick Pipeline Live
+                </h3>
               </div>
-              <h3 className="text-lg font-bold text-white mt-0.5">
-                Test POST /api/webhook/kick Pipeline Live
-              </h3>
+              <span className="rounded-md bg-[#53FC18]/10 border border-[#53FC18]/40 px-2.5 py-1 text-[11px] font-mono text-[#53FC18]">
+                1-Time Follow Guard ({settings.followedUsernamesHistory?.length || 0} tracked)
+              </span>
             </div>
 
             <form onSubmit={handleSendRealKickWebhookPost} className="space-y-3">
@@ -562,6 +573,11 @@ export const TabWebhookSetup: React.FC<TabWebhookSetupProps> = ({
                                 : 'started following'}
                         </span>
                       </span>
+                      {log.duplicateFollowSuppressed && (
+                        <span className="rounded bg-amber-500/15 border border-amber-400/40 px-2 py-0.5 text-[10px] font-mono text-amber-300">
+                          1x Follow Blocked (Repeat Unfollow/Follow)
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs font-mono text-slate-400 tabular-nums">
                       <span>{new Date(log.timestamp).toLocaleTimeString()}</span>

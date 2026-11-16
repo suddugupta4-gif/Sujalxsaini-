@@ -59,6 +59,7 @@ export interface WebhookLogEntry {
   eventType: string;
   username: string;
   status: number;
+  duplicateFollowSuppressed?: boolean;
   headers: Record<string, string>;
   payload: Record<string, unknown>;
 }
@@ -137,6 +138,7 @@ export interface AppSettings {
   customAvatarUrl?: string;
   ttsSettings: TtsSettings;
   recentFollowers: RecentFollower[];
+  followedUsernamesHistory?: string[];
   webhookLogs: WebhookLogEntry[];
   goalLinkHistory?: GoalLinkHistoryItem[];
   textAlertLinkHistory?: TextAlertLinkHistoryItem[];

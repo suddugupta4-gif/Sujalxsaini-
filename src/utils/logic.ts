@@ -1106,3 +1106,90 @@ export function resolveLiveObsAlertConfig(options: {
     ttsVolume: overrides.volume ?? 1.0,
   };
 }
+
+export function normalizeFollowerKey(username: string): string {
+  return (username || '').trim().toLowerCase();
+}
+
+export function hasUserAlreadyFollowed(
+  username: string,
+  history?: string[]
+): boolean {
+  const key = normalizeFollowerKey(username);
+  if (!key || !Array.isArray(history) || history.length === 0) return false;
+  return history.some((entry) => normalizeFollowerKey(entry) === key);
+}
+
+export function recordFollowedUsername(
+  username: string,
+  history?: string[],
+  maxEntries = 10000
+): string[] {
+  const key = normalizeFollowerKey(username);
+  const cleanHistory = Array.isArray(history)
+    ? history.map(normalizeFollowerKey).filter(Boolean)
+    : [];
+  if (!key) return Array.from(new Set(cleanHistory)).slice(0, maxEntries);
+  if (cleanHistory.includes(key)) {
+    return Array.from(new Set(cleanHistory)).slice(0, maxEntries);
+  }
+  return [key, ...cleanHistory].slice(0, maxEntries);
+}
+
+export function seedFollowedUsernamesFromRecent(
+  existingHistory: string[] | undefined,
+  recentFollowers: Array<{
+    username?: string;
+    eventType?: AlertEventType;
+    source?: string;
+  }> = []
+): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+
+  if (Array.isArray(existingHistory)) {
+    for (const entry of existingHistory) {
+      const key = normalizeFollowerKey(entry);
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        ordered.push(key);
+      }
+    }
+  }
+
+  for (const item of recentFollowers) {
+    const isFollow = !item.eventType || item.eventType === 'follow';
+    const isRealOrSimFollow =
+      item.source === 'kick-webhook' || item.source === 'simulator';
+    if (isFollow && isRealOrSimFollow && item.username) {
+      const key = normalizeFollowerKey(item.username);
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        ordered.push(key);
+      }
+    }
+  }
+
+  return ordered.slice(0, 10000);
+}
+
+/**
+ * Enforces the one-time-per-follower rule:
+ * A viewer who follows once gets the follow overlay + TTS one time.
+ * If they unfollow and re-follow later, both follow overlay & TTS are suppressed.
+ * Kicks, sub gifts, sub buys, and manual dashboard Test/Replay triggers are never suppressed.
+ */
+export function shouldSuppressDuplicateFollowAlert(options: {
+  eventType: AlertEventType;
+  source: 'kick-webhook' | 'simulator' | 'test' | 'replay';
+  username: string;
+  followedHistory?: string[];
+}): boolean {
+  const { eventType, source, username, followedHistory } = options;
+  if (eventType !== 'follow') return false;
+  if (source !== 'kick-webhook' && source !== 'simulator') return false;
+  const key = normalizeFollowerKey(username);
+  if (!key || key === 'kickuser') return false;
+  return hasUserAlreadyFollowed(key, followedHistory);
+}
+

@@ -9,6 +9,7 @@ import type {
 } from '../types';
 import {
   formatEventTtsText,
+  normalizeFollowerKey,
   parseObsQueryOverrides,
   resolveLiveObsAlertConfig,
 } from '../utils/logic';
@@ -48,6 +49,7 @@ export const ObsAlertsOverlay: React.FC<ObsAlertsOverlayProps> = ({
   const clearTimerRef = useRef<number | null>(null);
   const activeAlertRef = useRef<FollowAlertPayload | null>(null);
   const seenAlertIdsRef = useRef<Set<string>>(new Set());
+  const seenFollowUsersSessionRef = useRef<Set<string>>(new Set());
 
   const queryOverrides = parseObsQueryOverrides(window.location.search, settings || undefined);
   const isTextOnlyChannel = textOnlyMode || queryOverrides.obsMode === 'text-alerts';
@@ -208,6 +210,19 @@ export const ObsAlertsOverlay: React.FC<ObsAlertsOverlayProps> = ({
 
     if (seenAlertIdsRef.current.has(payload.id)) return;
     seenAlertIdsRef.current.add(payload.id);
+
+    if (
+      eventType === 'follow' &&
+      (payload.source === 'kick-webhook' || payload.source === 'simulator')
+    ) {
+      const normalizedUser = normalizeFollowerKey(payload.username);
+      if (normalizedUser && normalizedUser !== 'kickuser') {
+        if (seenFollowUsersSessionRef.current.has(normalizedUser)) {
+          return;
+        }
+        seenFollowUsersSessionRef.current.add(normalizedUser);
+      }
+    }
 
     if (activeAlertRef.current?.id.startsWith('init-')) {
       if (clearTimerRef.current) {
