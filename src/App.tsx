@@ -14,6 +14,7 @@ import {
   VolumeX,
   Lock,
   ExternalLink,
+  Move,
   Webhook,
   Zap,
 } from 'lucide-react';
@@ -25,7 +26,9 @@ import type {
   WebhookLogEntry,
 } from './types';
 import {
+  DEFAULT_OBS_LAYOUT,
   formatEventTtsText,
+  normalizeObsLayout,
   parseObsQueryOverrides,
 } from './utils/logic';
 import {
@@ -42,6 +45,7 @@ import { TabKicksSubsStudio } from './components/TabKicksSubsStudio';
 import { TabCounterStudio } from './components/TabCounterStudio';
 import { TabWebhookSetup } from './components/TabWebhookSetup';
 import { TabObsSetupGuide } from './components/TabObsSetupGuide';
+import { TabObsPositioner } from './components/TabObsPositioner';
 import { TabVipToolsFeed } from './components/TabVipToolsFeed';
 import { AlertCardRenderer } from './components/AlertCardTemplates';
 import { TextOnlyAlert } from './components/TextOnlyAlert';
@@ -50,6 +54,7 @@ type DashboardTabId =
   | 'alerts'
   | 'kicks-subs'
   | 'counter'
+  | 'obs-position'
   | 'webhook'
   | 'obs-guide'
   | 'vip-tools';
@@ -62,6 +67,8 @@ const FALLBACK_SETTINGS: AppSettings = {
   followerGoal: 500,
   goalTitle: 'ROAD TO 500 FOLLOWERS',
   showGoalOnCounter: true,
+  showRecentFollowerOnCounter: false,
+  obsLayout: DEFAULT_OBS_LAYOUT,
   alertsPaused: false,
   alertsMuted: false,
   activeAlertTemplate: 'neon',
@@ -233,6 +240,22 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
     setSettings((prev) => ({
       ...prev,
       ...partial,
+      obsLayout: partial.obsLayout
+        ? normalizeObsLayout({
+            alerts: {
+              ...normalizeObsLayout(prev.obsLayout).alerts,
+              ...(partial.obsLayout.alerts || {}),
+            },
+            textAlerts: {
+              ...normalizeObsLayout(prev.obsLayout).textAlerts,
+              ...(partial.obsLayout.textAlerts || {}),
+            },
+            counter: {
+              ...normalizeObsLayout(prev.obsLayout).counter,
+              ...(partial.obsLayout.counter || {}),
+            },
+          })
+        : normalizeObsLayout(prev.obsLayout),
       ttsSettings: {
         ...prev.ttsSettings,
         ...(partial.ttsSettings || {}),
@@ -463,6 +486,11 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
         ? String(settings.goalLinkHistory.length)
         : undefined,
       icon: <Target className="w-3.5 h-3.5" />,
+    },
+    {
+      id: 'obs-position',
+      label: 'OBS Position',
+      icon: <Move className="w-3.5 h-3.5" />,
     },
     {
       id: 'webhook',
@@ -758,6 +786,15 @@ function StreamerDashboard({ autostart }: { autostart: boolean }) {
             onUpdateSettings={handleUpdateSettings}
             onAdjustCounter={handleAdjustCounter}
             onTriggerMilestone={handleTriggerMilestone}
+          />
+        )}
+
+        {activeTab === 'obs-position' && (
+          <TabObsPositioner
+            settings={settings}
+            obsCounts={obsCounts}
+            onUpdateSettings={handleUpdateSettings}
+            onFireTestAlert={handleFireTestAlert}
           />
         )}
 

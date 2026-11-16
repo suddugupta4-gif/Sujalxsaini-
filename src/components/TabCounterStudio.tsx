@@ -469,6 +469,7 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
               `ROAD TO ${effectiveGoal.toLocaleString()} FOLLOWERS`
             }
             showGoal={settings.showGoalOnCounter ?? true}
+            showRecentFollower={settings.showRecentFollowerOnCounter ?? false}
             recentFollowers={settings.recentFollowers}
             previewUsername={previewUsername}
             customAvatarUrl={settings.customAvatarUrl}
@@ -484,15 +485,36 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
               · {remainingToGoal.toLocaleString()} to go
             </span>
             <div className="flex items-center gap-2">
-              <span>Preview Recent Follower:</span>
-              <input
-                type="text"
-                aria-label="Preview Recent Follower Username"
-                value={previewUsername}
-                onChange={(e) => onPreviewUsernameChange(e.target.value)}
-                placeholder="Follower username..."
-                className="rounded bg-[#070A0F] border border-slate-700 px-2.5 py-1 text-xs font-mono font-bold text-[#53FC18] w-40 focus:outline-none focus:border-[#53FC18]"
-              />
+              <button
+                type="button"
+                data-testid="toggle-recent-follower-in-goal-btn"
+                onClick={() =>
+                  onUpdateSettings({
+                    showRecentFollowerOnCounter: !(
+                      settings.showRecentFollowerOnCounter ?? false
+                    ),
+                  })
+                }
+                className={`rounded-lg px-2.5 py-1 text-xs font-mono border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  settings.showRecentFollowerOnCounter
+                    ? 'bg-[#53FC18]/15 border-[#53FC18]/50 text-[#53FC18]'
+                    : 'bg-[#070A0F] border-slate-700 text-slate-300 hover:text-white'
+                }`}
+              >
+                {settings.showRecentFollowerOnCounter
+                  ? 'Recent Follower: Shown'
+                  : 'Bar Mode: Goal Only'}
+              </button>
+              {settings.showRecentFollowerOnCounter && (
+                <input
+                  type="text"
+                  aria-label="Preview Recent Follower Username"
+                  value={previewUsername}
+                  onChange={(e) => onPreviewUsernameChange(e.target.value)}
+                  placeholder="Follower username..."
+                  className="rounded bg-[#070A0F] border border-slate-700 px-2.5 py-1 text-xs font-mono font-bold text-[#53FC18] w-36 focus:outline-none focus:border-[#53FC18]"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1055,6 +1077,7 @@ export const TabCounterStudio: React.FC<TabCounterStudioProps> = ({
                         `ROAD TO ${effectiveGoal.toLocaleString()} FOLLOWERS`
                       }
                       showGoal={settings.showGoalOnCounter ?? true}
+                      showRecentFollower={settings.showRecentFollowerOnCounter ?? false}
                       recentFollowers={settings.recentFollowers}
                       previewUsername={previewUsername}
                       customAvatarUrl={settings.customAvatarUrl}

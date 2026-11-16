@@ -4,6 +4,9 @@ import type {
   AppSettings,
   CounterTemplateId,
   FontFamilyName,
+  ObsElementPosition,
+  ObsLayoutSettings,
+  RecentFollower,
   SfxPresetId,
   TextAlertEventFilter,
   TextAlertStyle,
@@ -1192,4 +1195,130 @@ export function shouldSuppressDuplicateFollowAlert(options: {
   if (!key || key === 'kickuser') return false;
   return hasUserAlreadyFollowed(key, followedHistory);
 }
+
+// Standard CSS physical-to-pixel conversion (96 DPI / 2.54 cm per inch)
+export const PX_PER_CM = 96 / 2.54;
+
+export const DEFAULT_OBS_ELEMENT_POSITION: ObsElementPosition = {
+  xCm: 0,
+  yCm: 0,
+  scale: 1,
+};
+
+export const DEFAULT_OBS_LAYOUT: ObsLayoutSettings = {
+  alerts: { ...DEFAULT_OBS_ELEMENT_POSITION },
+  textAlerts: { ...DEFAULT_OBS_ELEMENT_POSITION },
+  counter: { ...DEFAULT_OBS_ELEMENT_POSITION },
+};
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+export function cmToPx(cm: number): number {
+  if (!Number.isFinite(cm)) return 0;
+  return round2(cm * PX_PER_CM);
+}
+
+export function pxToCm(px: number): number {
+  if (!Number.isFinite(px)) return 0;
+  return round2(px / PX_PER_CM);
+}
+
+export function clampObsElementPosition(
+  pos?: Partial<ObsElementPosition>
+): ObsElementPosition {
+  const rawX = typeof pos?.xCm === 'number' && Number.isFinite(pos.xCm) ? pos.xCm : 0;
+  const rawY = typeof pos?.yCm === 'number' && Number.isFinite(pos.yCm) ? pos.yCm : 0;
+  const rawScale =
+    typeof pos?.scale === 'number' && Number.isFinite(pos.scale) ? pos.scale : 1;
+
+  return {
+    xCm: round2(Math.min(25, Math.max(-25, rawX))),
+    yCm: round2(Math.min(15, Math.max(-15, rawY))),
+    scale: round2(Math.min(1.8, Math.max(0.5, rawScale))),
+  };
+}
+
+export function normalizeObsLayout(
+  layout?: Partial<ObsLayoutSettings> | null
+): ObsLayoutSettings {
+  return {
+    alerts: clampObsElementPosition(layout?.alerts),
+    textAlerts: clampObsElementPosition(layout?.textAlerts),
+    counter: clampObsElementPosition(layout?.counter),
+  };
+}
+
+export function nudgeObsElementPosition(
+  current: ObsElementPosition,
+  deltaXCm: number,
+  deltaYCm: number
+): ObsElementPosition {
+  return clampObsElementPosition({
+    xCm: current.xCm + deltaXCm,
+    yCm: current.yCm + deltaYCm,
+    scale: current.scale,
+  });
+}
+
+export function formatObsTransformStyle(pos?: Partial<ObsElementPosition>): {
+  transform: string;
+  transformOrigin: string;
+} {
+  const clamped = clampObsElementPosition(pos);
+  const xPx = cmToPx(clamped.xCm);
+  const yPx = cmToPx(clamped.yCm);
+  return {
+    transform: `translate3d(${xPx}px, ${yPx}px, 0) scale(${clamped.scale})`,
+    transformOrigin: 'center center',
+  };
+}
+
+/**
+ * Filters recent events strictly to actual follow events (never kicks/sub-gifts/sub-buys)
+ * and deduplicates case-insensitively.
+ */
+export function getLatestFollowOnlyEntries(
+  recentFollowers: RecentFollower[] = [],
+  previewUsername?: string,
+  customAvatarUrl?: string
+): { username: string; avatarUrl?: string }[] {
+  const candidates: { username: string; avatarUrl?: string }[] = [];
+
+  if (previewUsername && previewUsername.trim()) {
+    candidates.push({
+      username: previewUsername.trim(),
+      avatarUrl: customAvatarUrl,
+    });
+  }
+
+  for (const item of recentFollowers) {
+    const isFollow = !item.eventType || item.eventType === 'follow';
+    if (isFollow && item.username && item.username.trim()) {
+      candidates.push({
+        username: item.username.trim(),
+        avatarUrl: item.avatarUrl || customAvatarUrl,
+      });
+    }
+  }
+
+  const unique: { username: string; avatarUrl?: string }[] = [];
+  const seen = new Set<string>();
+  for (const entry of candidates) {
+    const key = normalizeFollowerKey(entry.username);
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      unique.push(entry);
+    }
+    if (unique.length >= 5) break;
+  }
+
+  if (unique.length === 0) {
+    unique.push({ username: 'RohanGamingIN', avatarUrl: customAvatarUrl });
+  }
+
+  return unique;
+}
+
 

@@ -35,8 +35,8 @@ export const AutoFitUsername: React.FC<AutoFitUsernameProps> = ({
       : mode === 'counter-recent'
       ? 21
       : mode === 'subtitle-full'
-      ? 14
-      : 13.5;
+      ? 15.5
+      : 14;
 
   const minFontPx = mode === 'counter-recent' ? 12 : isSubtitle ? 10 : 8;
   const hardFloorPx = mode === 'counter-recent' ? 10 : 6.5;
@@ -138,15 +138,16 @@ export const AutoFitUsername: React.FC<AutoFitUsernameProps> = ({
           color: colorHex,
           textShadow,
           WebkitFontSmoothing: 'antialiased',
+          WebkitTextStroke: isSubtitle ? '0.3px currentColor' : '0.4px currentColor',
           ...(fontFamily ? { fontFamily } : {}),
         }}
         className={`inline-flex items-center gap-1.5 leading-tight whitespace-nowrap ${
           sharp
             ? isSubtitle
-              ? 'font-bold tracking-normal'
-              : 'font-extrabold tracking-normal'
+              ? 'font-black tracking-normal'
+              : 'font-black tracking-normal'
             : isSubtitle
-              ? 'font-bold tracking-wide animate-vfx-text'
+              ? 'font-black tracking-wide animate-vfx-text'
               : 'font-black tracking-wide animate-username-vfx'
         }`}
       >

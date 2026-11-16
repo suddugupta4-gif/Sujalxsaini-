@@ -6,6 +6,7 @@ import {
   calculateGoalPercentage,
   generateGamerAvatarDataUri,
   getFollowerAvatarUrl,
+  getLatestFollowOnlyEntries,
 } from '../utils/logic';
 import { AutoFitUsername } from './AutoFitUsername';
 
@@ -82,6 +83,7 @@ interface CounterCardProps {
   goal: number;
   goalTitle: string;
   showGoal: boolean;
+  showRecentFollower?: boolean;
   recentFollowers: RecentFollower[];
   previewUsername?: string;
   customAvatarUrl?: string;
@@ -94,80 +96,43 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
   goal,
   goalTitle,
   showGoal,
+  showRecentFollower = false,
   recentFollowers,
   previewUsername,
   customAvatarUrl,
 }) => {
   const pct = calculateGoalPercentage(count, goal);
   const remaining = Math.max(0, goal - count);
+  const shouldShowGoal = showGoal || !showRecentFollower;
 
-  // Build a clean, deduplicated list of follower entries with PFP support
-  const rawEntries: { username: string; avatarUrl?: string }[] = [
-    ...(previewUsername && previewUsername.trim()
-      ? [{ username: previewUsername.trim(), avatarUrl: customAvatarUrl }]
-      : []),
-    ...(recentFollowers && recentFollowers.length > 0
-      ? recentFollowers
-          .filter((f) => f.username && f.username.trim())
-          .map((f) => ({
-            username: f.username.trim(),
-            avatarUrl: f.avatarUrl || customAvatarUrl,
-          }))
-      : []),
-    { username: 'RohanGamingIN' },
-    { username: 'AaravSniper_IN' },
-    { username: 'ApexValkyrie' },
-    { username: 'KaranClutchX' },
-  ];
-
-  const uniqueFollowers: { username: string; avatarUrl?: string }[] = [];
-  for (const item of rawEntries) {
-    if (
-      !uniqueFollowers.some(
-        (existing) =>
-          existing.username.toLowerCase() === item.username.toLowerCase()
-      )
-    ) {
-      uniqueFollowers.push(item);
-    }
-    if (uniqueFollowers.length >= 5) break;
-  }
-
-  const [activeFollowerIdx, setActiveFollowerIdx] = useState(0);
-
-  useEffect(() => {
-    if (previewUsername && previewUsername.trim()) {
-      setActiveFollowerIdx(0);
-    }
-  }, [previewUsername]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setActiveFollowerIdx((prev) => (prev + 1) % uniqueFollowers.length);
-    }, 3200);
-    return () => window.clearInterval(timer);
-  }, [uniqueFollowers.length]);
-
-  const currentRecent =
-    uniqueFollowers[activeFollowerIdx % uniqueFollowers.length] ||
-    uniqueFollowers[0] || { username: 'RohanGamingIN' };
+  // Strictly filter to actual follow events (never kicks/sub-gifts/sub-buys)
+  const uniqueFollowers = getLatestFollowOnlyEntries(
+    recentFollowers,
+    previewUsername,
+    customAvatarUrl
+  );
+  const currentRecent = uniqueFollowers[0] || { username: 'RohanGamingIN' };
 
   const fontStyle = { fontFamily: `'${font}', sans-serif` };
   const crispReadFontStack = "'Outfit', 'Rajdhani', system-ui, -apple-system, sans-serif";
-  const crispShadow = '0 2px 3px rgba(0, 0, 0, 0.98), 0 0 1px rgba(0, 0, 0, 1)';
+  const crispShadow =
+    '0 2px 4px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 1)';
+  const boldStrokeStyle = {
+    WebkitTextStroke: '0.35px currentColor',
+  };
 
-  // High-Contrast Goal Progress Bar & Crystal-Clear Follower Count Readout
+  // High-Contrast Goal Progress Bar & Crystal-Clear Bold Follower Count Readout
   const renderAnimatedGoalProgressBar = (
     barGradientClass: string,
     accentHex: string,
     trackBorderClass: string
   ) => (
     <div>
-      {/* Row 1: Goal Title + Large Crisp Percentage Pill */}
-      <div className="flex items-center justify-between gap-2 mb-2">
+      {/* Row 1: Bold Goal Title + Large Crisp Percentage Badge */}
+      <div className="flex items-center justify-between gap-2 mb-2.5">
         <span
-          style={{ ...fontStyle, textShadow: crispShadow }}
-          className="text-xs sm:text-base font-extrabold tracking-wide text-white uppercase whitespace-nowrap truncate"
+          style={{ ...fontStyle, ...boldStrokeStyle, textShadow: crispShadow }}
+          className="text-sm sm:text-lg font-black tracking-wide text-white uppercase whitespace-nowrap truncate"
         >
           {goalTitle || `ROAD TO ${goal.toLocaleString()} FOLLOWERS`}
         </span>
@@ -178,7 +143,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
             backgroundColor: '#04070B',
             textShadow: crispShadow,
           }}
-          className="px-2.5 py-0.5 rounded-md border text-xs sm:text-sm font-mono font-black tabular-nums whitespace-nowrap shrink-0"
+          className="px-2.5 py-0.5 rounded-md border-2 text-sm sm:text-base font-mono font-black tabular-nums whitespace-nowrap shrink-0"
         >
           {pct}%
         </span>
@@ -186,7 +151,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
 
       {/* Row 2: Solid High-Contrast Progress Bar Track */}
       <div
-        className={`relative h-3.5 sm:h-4 w-full rounded-full bg-[#020408] overflow-hidden border ${trackBorderClass}`}
+        className={`relative h-4 sm:h-4.5 w-full rounded-full bg-[#020408] overflow-hidden border-2 ${trackBorderClass}`}
       >
         <motion.div
           initial={{ width: `${pct}%` }}
@@ -210,22 +175,28 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
         </motion.div>
       </div>
 
-      {/* Row 3: Prominent Bold White Follower Count + High-Contrast Goal & Remaining */}
+      {/* Row 3: Prominent Heavy Bold Follower Count + Goal & Remaining */}
       <div
         style={{ fontFamily: crispReadFontStack, textShadow: crispShadow }}
-        className="flex items-baseline justify-between gap-2 mt-2 tabular-nums"
+        className="flex items-baseline justify-between gap-2 mt-2.5 tabular-nums"
       >
         <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-          <span className="text-lg sm:text-xl font-black text-white leading-none">
+          <span
+            style={boldStrokeStyle}
+            className="text-xl sm:text-2xl font-black text-white leading-none"
+          >
             {count.toLocaleString()}
           </span>
-          <span className="text-xs sm:text-sm font-bold text-slate-200 leading-none">
+          <span
+            style={boldStrokeStyle}
+            className="text-sm sm:text-base font-black text-white/95 tracking-wide leading-none"
+          >
             / {goal.toLocaleString()} FOLLOWERS
           </span>
         </div>
         <span
-          style={{ color: accentHex }}
-          className="text-xs sm:text-sm font-extrabold uppercase tracking-wide whitespace-nowrap shrink-0"
+          style={{ color: accentHex, ...boldStrokeStyle }}
+          className="text-sm sm:text-base font-black uppercase tracking-wide whitespace-nowrap shrink-0"
         >
           {remaining > 0 ? `${remaining.toLocaleString()} TO GO` : 'GOAL REACHED!'}
         </span>
@@ -294,7 +265,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
                   style={{ backgroundColor: accentHex }}
                   className="w-2 h-2 rounded-full shrink-0"
                 />
-                <span className="text-xs sm:text-[13px] font-bold text-slate-100 whitespace-nowrap truncate">
+                <span className="text-sm sm:text-[15px] font-black text-white whitespace-nowrap truncate">
                   started following
                 </span>
               </div>
@@ -302,10 +273,10 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
               <span
                 style={{
                   color: accentHex,
-                  borderColor: `${accentHex}70`,
+                  borderColor: `${accentHex}85`,
                   backgroundColor: '#05080D',
                 }}
-                className="px-1.5 sm:px-2 py-0.5 rounded border text-[9px] sm:text-[10px] font-mono font-extrabold uppercase tracking-wider whitespace-nowrap shrink-0 inline-flex items-center gap-1"
+                className="px-1.5 sm:px-2 py-0.5 rounded border text-[10px] sm:text-[11px] font-mono font-black uppercase tracking-wider whitespace-nowrap shrink-0 inline-flex items-center gap-1"
               >
                 <Zap className="w-2.5 h-2.5 shrink-0" />
                 <span className="sm:hidden">NEW</span>
@@ -327,14 +298,14 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
             className="pointer-events-none absolute top-0 left-0 w-1/2 h-[2px] bg-gradient-to-r from-transparent via-[#53FC18] to-transparent animate-laser-scan"
           />
 
-          {showGoal &&
+          {shouldShowGoal &&
             renderAnimatedGoalProgressBar(
               'bg-gradient-to-r from-[#16A34A] via-[#22C55E] to-[#53FC18]',
               '#53FC18',
               'border-[#53FC18]/50'
             )}
 
-          {renderAnimatedRecentFollowsRow('#53FC18', showGoal)}
+          {showRecentFollower && renderAnimatedRecentFollowsRow('#53FC18', shouldShowGoal)}
         </div>
       </div>
     );
@@ -350,14 +321,14 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
           />
 
           <div className="relative z-10">
-            {showGoal &&
+            {shouldShowGoal &&
               renderAnimatedGoalProgressBar(
                 'bg-gradient-to-r from-[#B8860B] via-[#FFD700] to-[#FFF3B0]',
                 '#FFD700',
                 'border-[#FFD700]/50'
               )}
 
-            {renderAnimatedRecentFollowsRow('#FFD700', showGoal)}
+            {showRecentFollower && renderAnimatedRecentFollowsRow('#FFD700', shouldShowGoal)}
           </div>
         </div>
       </div>
@@ -376,18 +347,18 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
             className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-[#53FC18]"
           />
 
-          {showGoal && (
+          {shouldShowGoal && (
             <div>
-              <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center justify-between gap-2 mb-2.5">
                 <span
-                  style={{ ...fontStyle, textShadow: crispShadow }}
-                  className="text-xs sm:text-base font-extrabold tracking-wide text-white uppercase whitespace-nowrap truncate"
+                  style={{ ...fontStyle, ...boldStrokeStyle, textShadow: crispShadow }}
+                  className="text-sm sm:text-lg font-black tracking-wide text-white uppercase whitespace-nowrap truncate"
                 >
                   {goalTitle || `ROAD TO ${goal.toLocaleString()} FOLLOWERS`}
                 </span>
                 <span
                   style={{ textShadow: crispShadow }}
-                  className="px-2.5 py-0.5 rounded-md border border-[#53FC18] bg-[#04070B] text-white tabular-nums text-xs sm:text-sm font-mono font-black whitespace-nowrap shrink-0"
+                  className="px-2.5 py-0.5 rounded-md border-2 border-[#53FC18] bg-[#04070B] text-white tabular-nums text-sm sm:text-base font-mono font-black whitespace-nowrap shrink-0"
                 >
                   {pct}%
                 </span>
@@ -396,7 +367,7 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
                 {Array.from({ length: segments }).map((_, idx) => (
                   <div
                     key={idx}
-                    className={`h-3 rounded-xs transition-all duration-300 ${
+                    className={`h-3.5 rounded-xs transition-all duration-300 ${
                       idx < activeSegments
                         ? 'bg-gradient-to-r from-[#FF0055] to-[#53FC18]'
                         : 'bg-slate-800'
@@ -406,24 +377,33 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
               </div>
               <div
                 style={{ fontFamily: crispReadFontStack, textShadow: crispShadow }}
-                className="flex items-baseline justify-between gap-2 mt-2 tabular-nums"
+                className="flex items-baseline justify-between gap-2 mt-2.5 tabular-nums"
               >
                 <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-                  <span className="text-lg sm:text-xl font-black text-white leading-none">
+                  <span
+                    style={boldStrokeStyle}
+                    className="text-xl sm:text-2xl font-black text-white leading-none"
+                  >
                     {count.toLocaleString()}
                   </span>
-                  <span className="text-xs sm:text-sm font-bold text-slate-200 leading-none">
+                  <span
+                    style={boldStrokeStyle}
+                    className="text-sm sm:text-base font-black text-white/95 tracking-wide leading-none"
+                  >
                     / {goal.toLocaleString()} FOLLOWERS
                   </span>
                 </div>
-                <span className="text-[#53FC18] text-xs sm:text-sm font-extrabold uppercase tracking-wide whitespace-nowrap shrink-0">
+                <span
+                  style={boldStrokeStyle}
+                  className="text-[#53FC18] text-sm sm:text-base font-black uppercase tracking-wide whitespace-nowrap shrink-0"
+                >
                   {remaining > 0 ? `${remaining.toLocaleString()} TO GO` : 'GOAL REACHED!'}
                 </span>
               </div>
             </div>
           )}
 
-          {renderAnimatedRecentFollowsRow('#53FC18', showGoal)}
+          {showRecentFollower && renderAnimatedRecentFollowsRow('#53FC18', shouldShowGoal)}
         </div>
       </div>
     );
@@ -433,14 +413,14 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
     return (
       <div className="p-2 w-full">
         <div className="relative overflow-hidden rounded-2xl bg-[#070D17] border-2 border-sky-400/85 shadow-[0_0_24px_rgba(56,189,248,0.35)] p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
-          {showGoal &&
+          {shouldShowGoal &&
             renderAnimatedGoalProgressBar(
               'bg-gradient-to-r from-sky-400 via-emerald-300 to-fuchsia-400',
               '#38BDF8',
               'border-sky-400/50'
             )}
 
-          {renderAnimatedRecentFollowsRow('#38BDF8', showGoal)}
+          {showRecentFollower && renderAnimatedRecentFollowsRow('#38BDF8', shouldShowGoal)}
         </div>
       </div>
     );
@@ -450,14 +430,14 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
     return (
       <div className="p-2 w-full">
         <div className="relative overflow-hidden rounded-xl bg-[#040B07] border-2 border-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.35)] p-4 sm:p-5 text-white font-mono w-full max-w-lg mx-auto">
-          {showGoal &&
+          {shouldShowGoal &&
             renderAnimatedGoalProgressBar(
               'bg-gradient-to-r from-emerald-500 to-[#53FC18]',
               '#53FC18',
               'border-emerald-400/50'
             )}
 
-          {renderAnimatedRecentFollowsRow('#53FC18', showGoal)}
+          {showRecentFollower && renderAnimatedRecentFollowsRow('#53FC18', shouldShowGoal)}
         </div>
       </div>
     );
@@ -467,14 +447,14 @@ export const CounterCardRenderer: React.FC<CounterCardProps> = ({
   return (
     <div className="p-2 w-full">
       <div className="relative overflow-hidden rounded-xl bg-[#0D071A] border-2 border-fuchsia-400 shadow-[0_0_24px_rgba(232,121,249,0.45)] p-4 sm:p-5 text-white w-full max-w-lg mx-auto">
-        {showGoal &&
+        {shouldShowGoal &&
           renderAnimatedGoalProgressBar(
             'bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-300',
             '#F0ABFC',
             'border-fuchsia-400/50'
           )}
 
-        {renderAnimatedRecentFollowsRow('#F0ABFC', showGoal)}
+        {showRecentFollower && renderAnimatedRecentFollowsRow('#F0ABFC', shouldShowGoal)}
       </div>
     </div>
   );

@@ -18,6 +18,7 @@ import type {
   WebhookLogEntry,
 } from './src/types.ts';
 import {
+  DEFAULT_OBS_LAYOUT,
   PUBLIC_RENDER_ORIGIN,
   buildObsCounterUrl,
   buildObsTextAlertUrl,
@@ -26,6 +27,7 @@ import {
   extractFollowerUsername,
   formatEventTtsText,
   isMilestoneReached,
+  normalizeObsLayout,
   parseKickEventDetails,
   recordFollowedUsername,
   seedFollowedUsernamesFromRecent,
@@ -44,6 +46,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   followerGoal: 500,
   goalTitle: 'ROAD TO 500 FOLLOWERS',
   showGoalOnCounter: true,
+  showRecentFollowerOnCounter: false,
+  obsLayout: DEFAULT_OBS_LAYOUT,
   alertsPaused: false,
   alertsMuted: false,
   activeAlertTemplate: 'neon',
@@ -161,6 +165,8 @@ function loadSettings(): AppSettings {
       return {
         ...DEFAULT_SETTINGS,
         ...parsed,
+        showRecentFollowerOnCounter: parsed.showRecentFollowerOnCounter ?? false,
+        obsLayout: normalizeObsLayout(parsed.obsLayout),
         ttsSettings: {
           ...DEFAULT_SETTINGS.ttsSettings,
           ...(parsed.ttsSettings || {}),
@@ -483,6 +489,22 @@ async function startServer() {
     appState = {
       ...appState,
       ...updates,
+      obsLayout: updates.obsLayout
+        ? normalizeObsLayout({
+            alerts: {
+              ...normalizeObsLayout(appState.obsLayout).alerts,
+              ...(updates.obsLayout.alerts || {}),
+            },
+            textAlerts: {
+              ...normalizeObsLayout(appState.obsLayout).textAlerts,
+              ...(updates.obsLayout.textAlerts || {}),
+            },
+            counter: {
+              ...normalizeObsLayout(appState.obsLayout).counter,
+              ...(updates.obsLayout.counter || {}),
+            },
+          })
+        : normalizeObsLayout(appState.obsLayout),
       ttsSettings: {
         ...appState.ttsSettings,
         ...(updates.ttsSettings || {}),

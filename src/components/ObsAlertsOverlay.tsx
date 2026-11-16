@@ -9,7 +9,9 @@ import type {
 } from '../types';
 import {
   formatEventTtsText,
+  formatObsTransformStyle,
   normalizeFollowerKey,
+  normalizeObsLayout,
   parseObsQueryOverrides,
   resolveLiveObsAlertConfig,
 } from '../utils/logic';
@@ -488,95 +490,113 @@ export const ObsAlertsOverlay: React.FC<ObsAlertsOverlayProps> = ({
     Boolean(activeAlert) &&
     ((activeAlert?.eventType && activeAlert.eventType !== 'follow') || isTextOnlyChannel);
 
+  const obsLayout = normalizeObsLayout(settings?.obsLayout);
+  const activeElementPos = isActiveTextOnly || isTextOnlyChannel
+    ? obsLayout.textAlerts
+    : obsLayout.alerts;
+  const activeTransformStyle = formatObsTransformStyle(activeElementPos);
+
   return (
     <main
       data-testid={isTextOnlyChannel ? 'obs-text-alerts-canvas' : 'obs-alerts-canvas'}
       className="w-screen h-screen overflow-hidden bg-transparent flex flex-col items-center justify-center p-2 sm:p-6 select-none"
     >
-      <AnimatePresence mode="wait">
-        {milestoneBanner && !isTextOnlyChannel && (
-          <motion.div
-            key="milestone-banner"
-            initial={{ opacity: 0, scale: 0.8, y: -30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.85, y: -20 }}
-            className="mb-6 rounded-2xl bg-gradient-to-r from-[#171204]/95 via-[#09150B]/95 to-[#171204]/95 border-2 border-[#FFD700] px-8 py-5 text-center shadow-[0_0_50px_rgba(255,215,0,0.6)] max-w-2xl w-full"
-          >
-            <div className="flex items-center justify-center gap-3 text-[#FFD700] text-xs font-bold tracking-[0.28em] uppercase mb-1">
-              <Trophy className="w-4 h-4" />
-              <span>MILESTONE GOAL ACHIEVED</span>
-              <Trophy className="w-4 h-4" />
-            </div>
-            <div
-              className="text-3xl font-black text-white tracking-wide"
-              style={{ fontFamily: `'${resolvedFont}', sans-serif` }}
+      <div
+        data-testid="obs-alerts-positioned"
+        data-x-cm={String(activeElementPos.xCm)}
+        data-y-cm={String(activeElementPos.yCm)}
+        data-scale={String(activeElementPos.scale)}
+        style={{
+          ...activeTransformStyle,
+          transition: 'transform 160ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+        className="w-full flex flex-col items-center justify-center"
+      >
+        <AnimatePresence mode="wait">
+          {milestoneBanner && !isTextOnlyChannel && (
+            <motion.div
+              key="milestone-banner"
+              initial={{ opacity: 0, scale: 0.8, y: -30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.85, y: -20 }}
+              className="mb-6 rounded-2xl bg-gradient-to-r from-[#171204]/95 via-[#09150B]/95 to-[#171204]/95 border-2 border-[#FFD700] px-8 py-5 text-center shadow-[0_0_50px_rgba(255,215,0,0.6)] max-w-2xl w-full"
             >
-              {milestoneBanner.goalTitle}
-            </div>
-            <div className="text-sm font-mono text-[#53FC18] mt-1 tabular-nums">
-              {milestoneBanner.followerCount.toLocaleString()} /{' '}
-              {milestoneBanner.followerGoal.toLocaleString()} FOLLOWERS GOAL UNLOCKED!
-            </div>
-          </motion.div>
-        )}
+              <div className="flex items-center justify-center gap-3 text-[#FFD700] text-xs font-bold tracking-[0.28em] uppercase mb-1">
+                <Trophy className="w-4 h-4" />
+                <span>MILESTONE GOAL ACHIEVED</span>
+                <Trophy className="w-4 h-4" />
+              </div>
+              <div
+                className="text-3xl font-black text-white tracking-wide"
+                style={{ fontFamily: `'${resolvedFont}', sans-serif` }}
+              >
+                {milestoneBanner.goalTitle}
+              </div>
+              <div className="text-sm font-mono text-[#53FC18] mt-1 tabular-nums">
+                {milestoneBanner.followerCount.toLocaleString()} /{' '}
+                {milestoneBanner.followerGoal.toLocaleString()} FOLLOWERS GOAL UNLOCKED!
+              </div>
+            </motion.div>
+          )}
 
-        {activeAlert && isActiveTextOnly && (
-          <TextOnlyAlert
-            key={activeAlert.id}
-            eventType={
-              activeAlert.eventType && activeAlert.eventType !== 'follow'
-                ? activeAlert.eventType
-                : 'kicks'
-            }
-            username={activeAlert.username}
-            amount={activeAlert.amount}
-            subMessage={activeAlert.subMessage}
-            font={resolvedFont}
-            stylePreset={resolvedTextStyle}
-          />
-        )}
-
-        {activeAlert && !isActiveTextOnly && (
-          <motion.div
-            key={activeAlert.id}
-            initial={{ opacity: 1, y: 12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 22 }}
-            className="w-full flex justify-center"
-          >
-            <AlertCardRenderer
-              template={resolvedTemplate}
-              font={resolvedFont}
+          {activeAlert && isActiveTextOnly && (
+            <TextOnlyAlert
+              key={activeAlert.id}
+              eventType={
+                activeAlert.eventType && activeAlert.eventType !== 'follow'
+                  ? activeAlert.eventType
+                  : 'kicks'
+              }
               username={activeAlert.username}
-              avatarUrl={activeAlert.avatarUrl || settings?.customAvatarUrl}
-              ttsMessage={resolvedMessage}
-              isSpeaking={isSpeaking}
+              amount={activeAlert.amount}
+              subMessage={activeAlert.subMessage}
+              font={resolvedFont}
+              stylePreset={resolvedTextStyle}
             />
-          </motion.div>
-        )}
+          )}
 
-        {!activeAlert && activeMegaphone && !isTextOnlyChannel && (
-          <motion.div
-            key={activeMegaphone.id}
-            initial={{ opacity: 0, y: 30, scale: 0.92 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.92 }}
-            className="rounded-2xl bg-[#070B0E]/95 border-2 border-[#53FC18] neon-pulse-green p-6 max-w-xl w-full text-white"
-          >
-            <div className="flex items-center gap-3 text-xs font-mono uppercase tracking-[0.2em] text-[#53FC18] mb-2">
-              <Volume2 className="w-4 h-4 animate-bounce" />
-              <span>SUJALXSAINI LIVE VIP ANNOUNCEMENT</span>
-            </div>
-            <p
-              className="text-2xl font-bold text-white"
-              style={{ fontFamily: `'${resolvedFont}', sans-serif` }}
+          {activeAlert && !isActiveTextOnly && (
+            <motion.div
+              key={activeAlert.id}
+              initial={{ opacity: 1, y: 12, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+              className="w-full flex justify-center"
             >
-              {activeMegaphone.text}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <AlertCardRenderer
+                template={resolvedTemplate}
+                font={resolvedFont}
+                username={activeAlert.username}
+                avatarUrl={activeAlert.avatarUrl || settings?.customAvatarUrl}
+                ttsMessage={resolvedMessage}
+                isSpeaking={isSpeaking}
+              />
+            </motion.div>
+          )}
+
+          {!activeAlert && activeMegaphone && !isTextOnlyChannel && (
+            <motion.div
+              key={activeMegaphone.id}
+              initial={{ opacity: 0, y: 30, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.92 }}
+              className="rounded-2xl bg-[#070B0E]/95 border-2 border-[#53FC18] neon-pulse-green p-6 max-w-xl w-full text-white"
+            >
+              <div className="flex items-center gap-3 text-xs font-mono uppercase tracking-[0.2em] text-[#53FC18] mb-2">
+                <Volume2 className="w-4 h-4 animate-bounce" />
+                <span>SUJALXSAINI LIVE VIP ANNOUNCEMENT</span>
+              </div>
+              <p
+                className="text-2xl font-bold text-white"
+                style={{ fontFamily: `'${resolvedFont}', sans-serif` }}
+              >
+                {activeMegaphone.text}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </main>
   );
 };

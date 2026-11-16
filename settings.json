@@ -2,10 +2,28 @@
   "channelName": "sujalxsaini",
   "channelUrl": "https://kick.com/sujalxsaini",
   "pin": "1234",
-  "followerCount": 520,
-  "followerGoal": 500,
-  "goalTitle": "ROAD TO 500 FOLLOWERS",
+  "followerCount": 523,
+  "followerGoal": 1000,
+  "goalTitle": "ROAD TO 1,000 FOLLOWERS",
   "showGoalOnCounter": true,
+  "showRecentFollowerOnCounter": false,
+  "obsLayout": {
+    "alerts": {
+      "xCm": 0,
+      "yCm": 0,
+      "scale": 1
+    },
+    "textAlerts": {
+      "xCm": 0,
+      "yCm": 0,
+      "scale": 1
+    },
+    "counter": {
+      "xCm": 1.68,
+      "yCm": 8.8,
+      "scale": 1.8
+    }
+  },
   "alertsPaused": false,
   "alertsMuted": false,
   "activeAlertTemplate": "neon",
@@ -513,13 +531,13 @@
       "id": "goal-mweqhqhm-9v4q",
       "label": "NEON · 500 Goal",
       "url": "https://sujalx-kick-studio.onrender.com/?obs=counter&template=neon&font=Orbitron&showGoal=1&goalId=goal-mweqhqhm-9v4q",
-      "goal": 500,
-      "goalTitle": "ROAD TO 500 FOLLOWERS",
+      "goal": 1000,
+      "goalTitle": "ROAD TO 1,000 FOLLOWERS",
       "template": "neon",
       "font": "Orbitron",
       "showGoal": true,
       "createdAt": "2026-11-13T08:47:48.826Z",
-      "updatedAt": "2026-11-13T09:01:57.776Z"
+      "updatedAt": "2026-11-16T10:17:04.977Z"
     }
   ],
   "textAlertLinkHistory": [],

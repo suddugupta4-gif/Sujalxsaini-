@@ -23,6 +23,13 @@ import {
   recordFollowedUsername,
   seedFollowedUsernamesFromRecent,
   shouldSuppressDuplicateFollowAlert,
+  cmToPx,
+  pxToCm,
+  clampObsElementPosition,
+  normalizeObsLayout,
+  nudgeObsElementPosition,
+  formatObsTransformStyle,
+  getLatestFollowOnlyEntries,
 } from './logic';
 
 test('extractFollowerUsername handles official Kick webhook payload shapes', () => {
@@ -470,4 +477,59 @@ test('one-time follow rule blocks repeat follow overlay & TTS after unfollow+ref
   assert.equal(hasUserAlreadyFollowed('manualtesteronly', seeded), false);
   assert.equal(hasUserAlreadyFollowed('kicksonlysender', seeded), false);
 });
+
+test('OBS centimeter positioning helpers convert cm/px, clamp bounds, nudge cleanly, and build transform style', () => {
+  assert.equal(Math.round(cmToPx(1)), 38);
+  assert.equal(cmToPx(2), 75.59);
+  assert.equal(pxToCm(75.59), 2);
+
+  const clamped = clampObsElementPosition({ xCm: 40, yCm: -30, scale: 3 });
+  assert.deepEqual(clamped, { xCm: 25, yCm: -15, scale: 1.8 });
+
+  const normalized = normalizeObsLayout({
+    counter: { xCm: 3.5, yCm: -2, scale: 1.1 },
+  });
+  assert.deepEqual(normalized.counter, { xCm: 3.5, yCm: -2, scale: 1.1 });
+  assert.deepEqual(normalized.alerts, { xCm: 0, yCm: 0, scale: 1 });
+  assert.deepEqual(normalized.textAlerts, { xCm: 0, yCm: 0, scale: 1 });
+
+  const nudged = nudgeObsElementPosition(normalized.counter, -1.5, 2.5);
+  assert.deepEqual(nudged, { xCm: 2, yCm: 0.5, scale: 1.1 });
+
+  const style = formatObsTransformStyle({ xCm: 2, yCm: -1, scale: 1.25 });
+  assert.equal(style.transform, 'translate3d(75.59px, -37.8px, 0) scale(1.25)');
+  assert.equal(style.transformOrigin, 'center center');
+});
+
+test('getLatestFollowOnlyEntries ignores kicks/sub-gift/sub-buy events and returns follow-only entries', () => {
+  const entries = getLatestFollowOnlyEntries([
+    {
+      id: '1',
+      username: 'KicksGifterUser',
+      timestamp: '2026-11-16T01:00:00Z',
+      source: 'kick-webhook',
+      eventType: 'kicks',
+      amount: 500,
+    },
+    {
+      id: '2',
+      username: 'SubGifterUser',
+      timestamp: '2026-11-16T01:00:00Z',
+      source: 'kick-webhook',
+      eventType: 'sub-gift',
+      amount: 5,
+    },
+    {
+      id: '3',
+      username: 'RealFollowerOne',
+      timestamp: '2026-11-16T01:00:00Z',
+      source: 'kick-webhook',
+      eventType: 'follow',
+    },
+  ]);
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].username, 'RealFollowerOne');
+});
+
 

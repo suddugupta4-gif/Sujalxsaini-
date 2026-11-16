@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import type { AppSettings } from '../types';
-import { parseObsQueryOverrides } from '../utils/logic';
+import {
+  formatObsTransformStyle,
+  normalizeObsLayout,
+  parseObsQueryOverrides,
+} from '../utils/logic';
 import { CounterCardRenderer } from './CounterCardTemplates';
 
 export const ObsCounterOverlay: React.FC = () => {
@@ -91,22 +95,38 @@ export const ObsCounterOverlay: React.FC = () => {
       ? (settings.showGoalOnCounter ?? true)
       : overrides.showGoal;
   const recentFollowers = settings?.recentFollowers ?? [];
+  const showRecentFollower = settings?.showRecentFollowerOnCounter ?? false;
+  const counterPos = normalizeObsLayout(settings?.obsLayout).counter;
+  const transformStyle = formatObsTransformStyle(counterPos);
 
   return (
     <main
       data-testid="obs-counter-canvas"
       className="w-screen h-screen overflow-hidden bg-transparent flex items-center justify-center p-2 sm:p-4 select-none"
     >
-      <CounterCardRenderer
-        template={template}
-        font={font}
-        count={count}
-        goal={goal}
-        goalTitle={goalTitle}
-        showGoal={showGoal}
-        recentFollowers={recentFollowers}
-        customAvatarUrl={settings?.customAvatarUrl}
-      />
+      <div
+        data-testid="obs-counter-positioned"
+        data-x-cm={String(counterPos.xCm)}
+        data-y-cm={String(counterPos.yCm)}
+        data-scale={String(counterPos.scale)}
+        style={{
+          ...transformStyle,
+          transition: 'transform 160ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+        className="w-full flex justify-center"
+      >
+        <CounterCardRenderer
+          template={template}
+          font={font}
+          count={count}
+          goal={goal}
+          goalTitle={goalTitle}
+          showGoal={showGoal}
+          showRecentFollower={showRecentFollower}
+          recentFollowers={recentFollowers}
+          customAvatarUrl={settings?.customAvatarUrl}
+        />
+      </div>
     </main>
   );
 };

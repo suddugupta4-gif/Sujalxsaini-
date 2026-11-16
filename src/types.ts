@@ -114,6 +114,20 @@ export interface TextAlertLinkHistoryItem {
   updatedAt: string;
 }
 
+export type ObsElementKey = 'alerts' | 'textAlerts' | 'counter';
+
+export interface ObsElementPosition {
+  xCm: number;
+  yCm: number;
+  scale: number;
+}
+
+export interface ObsLayoutSettings {
+  alerts: ObsElementPosition;
+  textAlerts: ObsElementPosition;
+  counter: ObsElementPosition;
+}
+
 export interface AppSettings {
   channelName: string;
   channelUrl: string;
@@ -122,6 +136,8 @@ export interface AppSettings {
   followerGoal: number;
   goalTitle: string;
   showGoalOnCounter: boolean;
+  showRecentFollowerOnCounter?: boolean;
+  obsLayout?: ObsLayoutSettings;
   alertsPaused: boolean;
   alertsMuted: boolean;
   activeAlertTemplate: AlertTemplateId;
